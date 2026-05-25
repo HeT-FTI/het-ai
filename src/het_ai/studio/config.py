@@ -2,7 +2,11 @@ import os
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
+
+if TYPE_CHECKING:
+    from het_ai.dvc.config import DVCConfig
+    from het_ai.mlflow.config import MLflowConfig
 
 
 @dataclass
@@ -84,3 +88,19 @@ class TrainConfig:
             self.study_name = f"study_{int(time.time())}_{uuid.uuid4().hex[:6]}"
         if self.trial_root_dir is None:
             self.trial_root_dir = f"optuna_trials_{self.study_name}"
+
+        # 运行时类型校验：确保集成配置字段类型正确，早于运行阶段发现错误
+        if self.mlflow is not None:
+            from het_ai.mlflow.config import MLflowConfig
+            if not isinstance(self.mlflow, MLflowConfig):
+                raise TypeError(
+                    f"TrainConfig.mlflow 必须是 MLflowConfig 实例，"
+                    f"收到: {type(self.mlflow).__name__}"
+                )
+        if self.dvc is not None:
+            from het_ai.dvc.config import DVCConfig
+            if not isinstance(self.dvc, DVCConfig):
+                raise TypeError(
+                    f"TrainConfig.dvc 必须是 DVCConfig 实例，"
+                    f"收到: {type(self.dvc).__name__}"
+                )

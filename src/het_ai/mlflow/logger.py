@@ -200,6 +200,19 @@ class MLflowRunLogger:
         dvc_repo    = bundle.meta.get("dvc_repo", "")
         source_name = f"{dvc_repo}@{dvc_version}" if dvc_version else "local"
 
+        # 优先使用用户在 load_data() / mock_data() 中预先填入的 lineage_datasets，
+        # 适用于多目标、聚类、图像等无法自动转为表格的场景。
+        if bundle.lineage_datasets is not None:
+            for dataset in bundle.lineage_datasets:
+                try:
+                    mlflow.log_input(dataset)
+                except Exception as exc:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        f"[MLflowRunLogger] log_input 失败 (lineage_datasets): {exc}"
+                    )
+            return
+
         for split_name, split_data in bundle.splits.items():
             X = split_data.get("X")
             y = split_data.get("y")
