@@ -51,6 +51,10 @@ class TrainConfig:
         default_factory=lambda: os.environ.get("LOG_LEVEL", "INFO")
     )
 
+    # 新增：可选集成，None = 不启用
+    dvc: Optional["DVCConfig"] = None       # from het_ai.dvc
+    mlflow: Optional["MLflowConfig"] = None # from het_ai.mlflow
+
     def __post_init__(self):
         if self.study_name is None:
             self.study_name = f"study_{int(time.time())}_{uuid.uuid4().hex[:6]}"

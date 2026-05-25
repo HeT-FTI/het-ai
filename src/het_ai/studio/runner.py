@@ -48,9 +48,20 @@ class WorkflowRunner:
         extra_tags = self.trainer.on_study_end(study, best_trial)
         summary_path = self._save_summary(study, best_trial, export_path)
 
-        return self._build_result(
+        result = self._build_result(
             data, best_trial, export_path, summary_path, extra_tags
         )
+
+        mlflow_cfg = getattr(self.config, "mlflow", None)
+        if mlflow_cfg is not None:
+            from het_ai.mlflow.logger import MLflowRunLogger
+            MLflowRunLogger(mlflow_cfg).log(
+                bundle=data,
+                result=result,
+                run_name=self.config.study_name,
+            )
+
+        return result
 
     def _validate(self):
         train_fn = type(self.trainer).train
