@@ -35,6 +35,7 @@ dependencies = [
 torch = [
   "torch>=2.1.0",
   "onnx>=1.15.0",
+  "onnxscript>=0.1.0",
   "onnxruntime>=1.16.0"
 ]
 tensorflow = [
@@ -58,6 +59,7 @@ examples = [
   "pytest>=7.4.0",
   "torch>=2.1.0",
   "onnx>=1.15.0",
+  "onnxscript>=0.1.0",
   "onnxruntime>=1.16.0",
   "tensorflow>=2.14.0",
   "Pillow>=10.0.0",
