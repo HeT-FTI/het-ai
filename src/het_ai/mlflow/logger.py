@@ -307,8 +307,10 @@ class MLflowRunLogger:
     def _build_dataframe(X, y, feature_list, target_list) -> pd.DataFrame:
         X_np = MLflowRunLogger._to_numpy(X)
         y_np = MLflowRunLogger._to_numpy(y)
-        if X_np.ndim == 1: X_np = X_np.reshape(-1, 1)
-        if y_np.ndim == 1: y_np = y_np.reshape(-1, 1)
+        if X_np.ndim == 1:
+            X_np = X_np.reshape(-1, 1)
+        if y_np.ndim == 1:
+            y_np = y_np.reshape(-1, 1)
         if X_np.shape[1] != len(feature_list):
             raise ValueError(f"feature_list 长度 ({len(feature_list)}) ≠ X 列数 ({X_np.shape[1]})")
         if y_np.shape[1] != len(target_list):
