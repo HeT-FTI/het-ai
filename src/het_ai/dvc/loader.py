@@ -180,8 +180,25 @@ class DVCLoader:
             "Accept": "application/vnd.github.v3+json",
             "User-Agent": "het-ai/DVCLoader",
         })
-        self._owner_repo = GitHubTagResolver._parse_owner_repo(config.github_repo)
+        # self._owner_repo = GitHubTagResolver._parse_owner_repo(config.github_repo)
         self._api_base = config.github_api_base.rstrip("/")
+
+        # 仅在 github_repo 非空时解析（FixedTagResolver 场景下可能为空）
+        self._owner_repo = (
+            GitHubTagResolver._parse_owner_repo(config.github_repo)
+            if config.github_repo else ""
+        )
+
+        # MinIO 客户端仅在 endpoint 非空时初始化（FixedTagResolver 场景下可能不需要）
+        self._minio = (
+            Minio(
+                endpoint=config.minio_endpoint,
+                access_key=config.minio_access_key,
+                secret_key=config.minio_secret_key,
+                secure=config.minio_secure,
+            )
+            if config.minio_endpoint else None
+        )
 
     # ── 公共接口 ──────────────────────────────────────────────────────────────
 
@@ -232,10 +249,11 @@ class DVCLoader:
             "dvc_version":    tag,
             "dvc_commit_sha": commit_sha,
             "dvc_repo":       self.config.github_repo,
-            "dvc_remote":     (
-                f"s3://{self.config.minio_bucket}"
-                f"/{self.config.minio_virtual_folder}".rstrip("/")
-            ),
+            # "dvc_remote":     (
+            #     f"s3://{self.config.minio_bucket}"
+            #     f"/{self.config.minio_virtual_folder}".rstrip("/")
+            # ),
+            "dvc_remote": f"s3://{self.config.minio_bucket}/{self.config.minio_virtual_folder}".rstrip("/")
         })
         return bundle
 
@@ -281,14 +299,16 @@ class DVCLoader:
 
     def _dvc_pull(self, dvc_file: Path) -> None:
         """配置 DVC remote 并拉取实际数据到本地。"""
-        remote_url = (
-            f"s3://{self.config.minio_bucket}"
-            f"/{self.config.minio_virtual_folder}".rstrip("/")
-        )
-        endpoint_url = (
-            f"{'https' if self.config.minio_secure else 'http'}://"
-            f"{self.config.minio_endpoint}"
-        )
+        # remote_url = (
+        #     f"s3://{self.config.minio_bucket}"
+        #     f"/{self.config.minio_virtual_folder}".rstrip("/")
+        # )
+        remote_url = f"s3://{self.config.minio_bucket}/{self.config.minio_virtual_folder}".rstrip("/")
+        # endpoint_url = (
+        #     f"{'https' if self.config.minio_secure else 'http'}://"
+        #     f"{self.config.minio_endpoint}"
+        # )
+        endpoint_url = f"{'https' if self.config.minio_secure else 'http'}://{self.config.minio_endpoint}"
         commands = [
             ["dvc", "init", "--no-scm", "-f"],
             ["dvc", "remote", "add", "-d", "minio", remote_url, "-f"],

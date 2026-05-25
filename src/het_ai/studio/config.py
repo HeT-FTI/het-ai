@@ -51,9 +51,33 @@ class TrainConfig:
         default_factory=lambda: os.environ.get("LOG_LEVEL", "INFO")
     )
 
-    # 新增：可选集成，None = 不启用
-    dvc: Optional["DVCConfig"] = None       # from het_ai.dvc
-    mlflow: Optional["MLflowConfig"] = None # from het_ai.mlflow
+    # # 新增：可选集成，None = 不启用
+    # dvc: Optional["DVCConfig"] = None       # from het_ai.dvc
+    # mlflow: Optional["MLflowConfig"] = None # from het_ai.mlflow
+
+
+    # ── 集成配置 ─────────────────────────────────────────────────────
+    #
+    # mlflow: 框架自动触发。
+    #   设置后，WorkflowRunner 在训练结束时自动完成全部 MLflow 上报。
+    #   用户无需在 Trainer 里写任何 mlflow 代码。
+    mlflow: Optional["MLflowConfig"] = None
+
+    # dvc: 用户主动消费的配置载体，框架不自动触发 DVC 拉取。
+    #
+    # 设计原因：load_data() 是用户控制数据来源的唯一入口，
+    # 数据目录结构、多仓库合并、版本检测逻辑因项目而异，
+    # 框架无法替用户做这些决定。
+    #
+    # 推荐用法：
+    #   def load_data(self, dvc_data_root: str) -> DataBundle:
+    #       loader = DVCLoader(self.config.dvc or DVCConfig())
+    #       tag, sha = loader.pull(Path(dvc_data_root))
+    #       bundle = DataBundle(...)
+    #       return loader.enrich_bundle(bundle, tag, sha)
+    #
+    # 不使用 DVC 的场景（本地文件、其他数据源）无需设置此字段。
+    dvc: Optional["DVCConfig"] = None
 
     def __post_init__(self):
         if self.study_name is None:
