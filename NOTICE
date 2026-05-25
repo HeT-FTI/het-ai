@@ -1,0 +1,39 @@
+Copyright 2025 Shenzhen HeT Intelligent Control Co., Ltd.
+
+This project is licensed under the Apache License, Version 2.0 (the "License")
+for all software components, including but not limited to:
+- Source code
+- Build scripts
+- Test files
+- Configuration metadata
+- Any machine-readable or functional artifacts
+
+You may obtain a copy of the License at:
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+All original documentation, technical narratives, user guides, diagrams, and explanatory materials 
+(collectively, "Documentation"), including but not limited to content in /docs/sphinx/source/, 
+are copyright © 2025 Shenzhen HeT Intelligent Control Co., Ltd. (HeT) 
+and licensed under the Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0).
+
+This license grants third parties the right to share and adapt the Documentation for non-commercial purposes,
+provided appropriate credit is given.
+
+Notwithstanding the foregoing, Shenzhen HeT Intelligent Control Co., Ltd., as the original copyright holder 
+of the Documentation, retains all rights under copyright law and may license its own contributions—including 
+derivative works based thereon—under any terms it chooses, including commercial licenses (e.g., CC BY, 
+proprietary licenses). This reservation does not grant third parties any rights beyond those provided by 
+the CC BY-NC 4.0 License.
+
+Third parties wishing to use the Documentation for commercial purposes or otherwise beyond the scope of 
+CC BY-NC 4.0 must obtain prior written permission from HeT.
+
+For full license terms, see: https://creativecommons.org/licenses/by-nc/4.0/
+
+If this project includes a NOTICE file, you must retain all attribution notices therein in accordance 
+with Section 4(d) of the Apache License 2.0.
