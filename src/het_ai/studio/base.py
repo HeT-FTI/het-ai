@@ -87,8 +87,56 @@ class BaseTrainer(ABC):
     def on_study_end(self, study: Any, best_trial: Any) -> dict:
         return {}
 
+    def on_model_registered(self, result: "TrainResult") -> None:
+        """
+        模型注册到 MLflow Model Registry 后的回调钩子。
+        子类可覆写以触发部署（K8s、Seldon、TorchServe 等）或发送通知。
+
+        Args:
+            result: 训练完成后的标准化结果对象。
+        """
+
     def predict(self, model_path: str, inputs: Any) -> Any:
         raise NotImplementedError("如需推理验证，请覆写 predict()。")
+
+    def _validate_integration_configs(self) -> None:
+        """
+        检查 TrainConfig 中集成配置的必填字段。
+        在 dry_run() 和 run() 之前调用，提前发现配置错误。
+        """
+        dvc_cfg = getattr(self.config, "dvc", None)
+        if dvc_cfg is not None:
+            missing = []
+            if not getattr(dvc_cfg, "minio_endpoint", ""):
+                missing.append("dvc.minio_endpoint")
+            if not getattr(dvc_cfg, "minio_access_key", ""):
+                missing.append("dvc.minio_access_key")
+            if not getattr(dvc_cfg, "minio_secret_key", ""):
+                missing.append("dvc.minio_secret_key")
+            if not getattr(dvc_cfg, "github_repo", ""):
+                missing.append("dvc.github_repo")
+            if not getattr(dvc_cfg, "github_token", ""):
+                missing.append("dvc.github_token")
+            if missing:
+                raise ValueError(
+                    f"[{type(self).__name__}] DVCConfig 缺少必填字段: "
+                    f"{', '.join(missing)}。"
+                    f"请通过显式传参或环境变量完成配置后再运行。"
+                )
+
+        mlflow_cfg = getattr(self.config, "mlflow", None)
+        if mlflow_cfg is not None:
+            missing = []
+            if not getattr(mlflow_cfg, "tracking_uri", ""):
+                missing.append("mlflow.tracking_uri")
+            if not getattr(mlflow_cfg, "experiment_name", ""):
+                missing.append("mlflow.experiment_name")
+            if missing:
+                raise ValueError(
+                    f"[{type(self).__name__}] MLflowConfig 缺少必填字段: "
+                    f"{', '.join(missing)}。"
+                    f"请通过显式传参或环境变量完成配置后再运行。"
+                )
 
     def report(self, step: int, value: float) -> bool:
         trial = getattr(self._trial_local, "current", None)
@@ -98,6 +146,9 @@ class BaseTrainer(ABC):
         return trial.should_prune()
 
     def dry_run(self, dvc_data_root: Optional[str] = None) -> dict:
+        # ── 配置结构预检：提前发现外部集成配置错误 ──────────────────────────
+        self._validate_integration_configs()
+
         try:
             self._logger.info("[dry_run] ① 尝试 mock_data()...")
             data = self.mock_data()
@@ -151,6 +202,7 @@ class BaseTrainer(ABC):
     def run(self, dvc_data_root: Optional[str] = None) -> TrainResult:
         from het_ai.studio.runner import WorkflowRunner
 
+        self._validate_integration_configs()
         root = dvc_data_root or self.config.dvc_data_root
         return WorkflowRunner(self).execute(root)
 

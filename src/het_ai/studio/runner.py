@@ -31,8 +31,22 @@ class WorkflowRunner:
     def execute(self, dvc_data_root: str) -> TrainResult:
         self._validate()
 
+        # ── Step 0: 自动 DVC 数据拉取（仅当 config.dvc 已配置时）────────────
+        _dvc_tag, _dvc_sha = None, None
+        dvc_cfg = getattr(self.config, "dvc", None)
+        if dvc_cfg is not None:
+            from het_ai.dvc.loader import DVCLoader
+            loader = DVCLoader(dvc_cfg)
+            logger.info("Step 0/4  自动拉取 DVC 数据...")
+            _dvc_tag, _dvc_sha = loader.pull(Path(dvc_data_root))
+            logger.info(f"Step 0/4  DVC 数据版本: tag={_dvc_tag}  sha={_dvc_sha[:8] if _dvc_sha else ''}")
+
         logger.info("Step 1/4  加载数据...")
         data = self.trainer.load_data(dvc_data_root)
+
+        # 自动将 DVC 版本元数据注入 DataBundle.meta（不覆盖用户已设置的字段）
+        if dvc_cfg is not None and _dvc_tag is not None:
+            loader.enrich_bundle(data, _dvc_tag, _dvc_sha or "")
 
         logger.info("Step 2/4  启动 Optuna HPO...")
         study = self._run_study(data)
@@ -60,6 +74,9 @@ class WorkflowRunner:
                 result=result,
                 run_name=self.config.study_name,
             )
+
+        # P6: 模型注册后回调钩子（供子类触发部署/通知）
+        self.trainer.on_model_registered(result)
 
         return result
 

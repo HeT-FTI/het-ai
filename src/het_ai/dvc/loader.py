@@ -104,12 +104,23 @@ class GitHubTagResolver:
             )
 
         if strategy == "latest":
-            # 按 commit date 排序取最新
-            def _date(t):
-                return t.get("commit", {}).get("commit", {}).get(
-                    "committer", {}
-                ).get("date", "")
-            best = max(tags, key=_date)
+            # GitHub Tags API 的 commit 对象只是轻量指针，不含 committer.date 字段。
+            # 需要调用 Commits API 补全每个 tag 的实际提交时间，再取最新。
+            def _fetch_commit_date(tag) -> str:
+                sha = tag.get("commit", {}).get("sha", "")
+                if not sha:
+                    return ""
+                try:
+                    commit = self._api(f"/repos/{self._owner_repo}/commits/{sha}")
+                    return (
+                        commit.get("commit", {})
+                        .get("committer", {})
+                        .get("date", "")
+                    )
+                except Exception:
+                    return ""
+
+            best = max(tags, key=_fetch_commit_date)
             return best["name"], best.get("commit", {}).get("sha", "")
 
         raise ValueError(
