@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 import os
 
+
 @dataclass
 class MLflowConfig:
     """MLflow 上报配置。"""
@@ -14,11 +15,10 @@ class MLflowConfig:
 
     # 模型注册
     register_model: bool = True
-    registered_model_name: str = ""          # 空时用 experiment_name
+    registered_model_name: str = ""   # 空时用 experiment_name
+    model_name_suffix: str = "_prod"  # 注册名后缀，可覆盖
 
     # 数据集血缘自动上报
     log_dataset_lineage: bool = True
 
-    # 支持的导出格式："onnx" | "pt" | "tflite"
-    # 从 TrainConfig.export_formats 继承，此处可覆盖
-    export_formats: list = field(default_factory=lambda: ["onnx"])
+    # 注意：export_formats 由 TrainConfig 管理，此处不重复声明
