@@ -119,15 +119,16 @@ class GitHubTagResolver:
 
 class FixedTagResolver:
     """
-    固定版本解析器：直接使用指定的 tag，不查询远端。
+    固定版本解析器：直接使用指定的 tag，不通过 GitHub API 解析最新版本。
+
+    注意：此 Resolver 仅跳过 tag 解析步骤，DVCLoader.pull() 仍需网络访问
+    GitHub 下载 .dvc 指针文件并从 MinIO 拉取实际数据。
+    若需完全离线运行，应跳过 pull() 直接使用已缓存的本地数据。
 
     适用场景：
-      - 离线复现某次实验
+      - 复现指定版本的实验（tag 已知，无需动态解析）
       - CI 中由外部系统决定数据版本
-      - 本地调试时避免 GitHub API 调用
-
-    用法：
-        loader = DVCLoader(config, tag_resolver=FixedTagResolver("release-20250525", "abc1234"))
+      - 本地调试时避免 tag 解析的 GitHub API 调用 
     """
 
     def __init__(self, tag: str, commit_sha: str = ""):
@@ -168,12 +169,12 @@ class DVCLoader:
     ):
         self.config = config
         self._resolver = tag_resolver or GitHubTagResolver(config)
-        self._minio = Minio(
-            endpoint=config.minio_endpoint,
-            access_key=config.minio_access_key,
-            secret_key=config.minio_secret_key,
-            secure=config.minio_secure,
-        )
+        # self._minio = Minio(
+        #     endpoint=config.minio_endpoint,
+        #     access_key=config.minio_access_key,
+        #     secret_key=config.minio_secret_key,
+        #     secure=config.minio_secure,
+        # )
         self._session = requests.Session()
         self._session.headers.update({
             "Authorization": f"token {config.github_token}",
