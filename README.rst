@@ -1,12 +1,16 @@
 het-ai
 ======
 
-.. image:: https://img.shields.io/badge/python-3.10%2B-blue
-   :alt: Python 3.10+
-.. image:: https://img.shields.io/badge/license-Apache%202.0-green
-   :alt: Apache 2.0
-.. image:: https://img.shields.io/badge/HPO-Optuna-orange
-   :alt: Optuna
+.. |badge1| image:: https://img.shields.io/badge/python-3.10+-blue?logo=python&logoColor=white
+   :target: https://www.python.org/downloads/
+
+.. |badge2| image:: https://img.shields.io/badge/license-Apache%202.0-green
+   :target: https://www.apache.org/licenses/LICENSE-2.0
+
+.. |badge3| image:: https://img.shields.io/badge/HPO-Optuna-blue?logo=optuna
+   :target: https://optuna.org/
+
+|badge1| |badge2| |badge3|
 
 **het-ai** is a framework-agnostic MLOps training DSL that provides a structured
 abstraction for the full training lifecycle, powered by `Optuna <https://optuna.org/>`_-driven
@@ -16,6 +20,12 @@ Whether you work with PyTorch, TensorFlow, scikit-learn, PyMC, plain NumPy, or a
 black-box external process, het-ai lets you express the complete
 *data loading → hyperparameter search → model training → export* pipeline through
 a single, consistent interface.
+
+When combined with the optional ``dvc`` and ``mlflow`` extras, het-ai becomes a
+**data-version-driven platform**: a new DVC release tag on your data repository
+automatically drives a full HPO run, and every MLflow experiment is tagged with the
+exact data version that produced it — closing the data → experiment → model
+traceability loop.
 
 Developed and maintained by
 `Shenzhen HeT Intelligent Control Co., Ltd. <https://github.com/HeT-FTI>`_
@@ -35,8 +45,12 @@ Key Features
   overridden by an environment variable, making container and CI/CD integration seamless.
 - **Dry-run validation** — verify the entire pipeline locally without production data
   or a remote training server using a single ``trainer.dry_run()`` call.
-- **DVC integration** — the ``load_data`` hook accepts a DVC data root directory out
-  of the box.
+- **DVC + MinIO integration** — ``het_ai.dvc`` resolves the latest data version tag from
+  GitHub, pulls actual data from MinIO via DVC, and injects version metadata into the
+  ``DataBundle`` for downstream traceability.
+- **MLflow auto-logging** — set ``TrainConfig(mlflow=MLflowConfig(...))`` and the
+  framework automatically logs params, metrics, dataset lineage, and registers the model
+  after every run. No MLflow code required in your ``Trainer``.
 - **ONNX model export** — exports to ONNX by default; easily extended to any custom
   format via ``export_model()``.
 
@@ -45,20 +59,26 @@ Key Features
 Installation
 ------------
 
-Core package (minimal dependencies):
+Core package (HPO only, minimal dependencies):
 
 .. code-block:: bash
 
    pip install het-ai
 
-Install optional framework extras as needed:
+Full platform (HPO + DVC data versioning + MLflow tracking):
+
+.. code-block:: bash
+
+   pip install "het-ai[platform]"
+
+Install optional ML framework extras as needed:
 
 .. code-block:: bash
 
    # PyTorch + ONNX export
    pip install "het-ai[torch]"
 
-   # TensorFlow
+   # TensorFlow / Keras / TFLite
    pip install "het-ai[tensorflow]"
 
    # scikit-learn
@@ -66,6 +86,9 @@ Install optional framework extras as needed:
 
    # Bayesian modelling with PyMC
    pip install "het-ai[bayes]"
+
+   # Full platform + PyTorch
+   pip install "het-ai[platform,torch]"
 
    # All dependencies required to run the bundled examples
    pip install "het-ai[examples]"
@@ -119,8 +142,84 @@ Subclass ``BaseTrainer``, declare your search space, and implement three hooks:
 
 ----
 
+Data-Version-Driven Platform
+------------------------------
+
+When DVC and MLflow extras are installed, het-ai drives the entire pipeline
+from a data version tag to a registered model — fully automatically.
+
+.. code-block:: python
+
+   from het_ai.studio import BaseTrainer, TrainConfig
+   from het_ai.studio.bundle import DataBundle
+   from het_ai.dvc import DVCLoader, DVCConfig
+   from het_ai.mlflow import MLflowConfig
+   from het_ai.studio.types import TunableFloat
+   from pathlib import Path
+   import pandas as pd
+
+
+   class MyTrainer(BaseTrainer):
+
+       @BaseTrainer.search(lr=TunableFloat(1e-4, 1e-2, log=True))
+       def train(self, data: DataBundle, lr: float):
+           ...
+
+       def load_data(self, dvc_data_root: str) -> DataBundle:
+           # Pull versioned data: GitHub tag → MinIO → local
+           loader = DVCLoader(self.config.dvc or DVCConfig())
+           tag, sha = loader.pull(Path(dvc_data_root))
+
+           df = pd.read_csv(f"{dvc_data_root}/data.csv")
+           bundle = DataBundle(
+               splits={"train": {"X": df[features].values,
+                                 "y": df["label"].values}},
+               feature_list=features,
+               target_list=["label"],
+           )
+           # Inject version metadata — MLflow will tag the Run automatically
+           return loader.enrich_bundle(bundle, tag, sha)
+
+       def mock_data(self) -> DataBundle: ...
+       def export_model(self, artifact, export_dir) -> str: ...
+
+
+   config = TrainConfig(
+       n_trials=100,
+       dvc=DVCConfig(),        # reads DVC_GITHUB_* and MINIO_* env vars
+       mlflow=MLflowConfig(    # reads MLFLOW_TRACKING_URI and MLFLOW_EXPERIMENT
+           experiment_name="my-project",
+       ),
+   )
+
+   # DVC pull → Optuna HPO → model export →
+   # MLflow Run logged with dvc_version tag → model registered
+   result = MyTrainer(config).run()
+
+After ``run()`` completes, every MLflow Run is tagged with the DVC version
+(e.g. ``dvc_version = release-20250525``) that produced it, and the model is
+registered as ``my-project_prod`` in the MLflow Model Registry.
+
+The minimum required environment variables for the full platform:
+
+.. code-block:: bash
+
+   # DVC / GitHub
+   export DVC_GITHUB_REPO=org/data-repo
+   export DVC_GITHUB_TOKEN=ghp_xxxxxxxxxxxx
+   export MINIO_ENDPOINT=minio.internal:9000
+   export MINIO_ACCESS_KEY=minioadmin
+   export MINIO_SECRET_KEY=minioadmin
+   export MINIO_BUCKET=dvc-store
+
+   # MLflow
+   export MLFLOW_TRACKING_URI=http://mlflow.internal:5000
+   export MLFLOW_EXPERIMENT=my-project
+
+----
+
 Multi-Objective Optimisation
------------------------------
+------------------------------
 
 Declare an ``objectives`` dict to enable Pareto-front HPO.
 The framework switches Optuna to multi-directional mode automatically:
@@ -197,11 +296,19 @@ Precedence: **env var > explicit argument > default value**.
      - ``LOG_LEVEL``
      - Logging verbosity
      - ``INFO``
+   * - ``dvc``
+     - —
+     - ``DVCConfig`` instance; consumed by ``load_data()`` to pull versioned data
+     - ``None``
+   * - ``mlflow``
+     - —
+     - ``MLflowConfig`` instance; triggers automatic MLflow logging after ``run()``
+     - ``None``
 
 ----
 
 Supported Training Scenarios
------------------------------
+------------------------------
 
 The bundled test suite covers eight representative scenarios, all runnable via
 ``dry_run()`` without any external dependencies:
@@ -272,4 +379,4 @@ License
 
 For commercial use of the documentation, please contact HeT directly.
 
-Copyright © 2025 Shenzhen HeT Intelligent Control Co., Ltd.
+Copyright © 2026 Shenzhen HeT Intelligent Control Co., Ltd.
