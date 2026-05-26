@@ -109,6 +109,10 @@ from tests.cases.case5_clustering import ClusteringTrainer
 from tests.cases.case6_pymc_bayesian import BayesianMixtureTrainer
 from tests.cases.case7_numpy_logistic import NumpyLogisticTrainer
 from tests.cases.case8_blackbox import BlackBoxTrainer
+from tests.cases.case9_sklearn_regression import SklearnRegressionTrainer
+from tests.cases.case10_torch_timeseries import TimeSeriesTrainer
+from tests.cases.case11_sklearn_anomaly import AnomalyDetectionTrainer
+from tests.cases.case12_torch_text import TextClassificationTrainer
 
 
 CASES = [
@@ -120,6 +124,10 @@ CASES = [
     ("案例六 PyMC 贝叶斯推断", BayesianMixtureTrainer),
     ("案例七 纯 NumPy 手写模型", NumpyLogisticTrainer),
     ("案例八 黑盒外部进程", BlackBoxTrainer),
+    ("案例九 sklearn表格回归", SklearnRegressionTrainer),
+    ("案例十 PyTorch时序预测", TimeSeriesTrainer),
+    ("案例十一 skearn异常检测", AnomalyDetectionTrainer),
+    ("案例十二 PyTorch文本分类", TextClassificationTrainer),
 ]
 
 
