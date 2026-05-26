@@ -37,6 +37,9 @@ Key Features
 
 - **Framework-agnostic** — optional dependency groups bring first-class support for
   PyTorch, TensorFlow, scikit-learn, PyMC, and arbitrary black-box processes.
+- **Broad task coverage** — supports high-frequency AI model development workflows across
+  **classification, regression, clustering, anomaly detection, time-series forecasting,
+  text classification, Bayesian inference, and black-box optimisation**.
 - **Declarative search spaces** — annotate tunable parameters directly in the
   ``train()`` signature with ``@BaseTrainer.search(...)``. No Optuna boilerplate required.
 - **Single- and multi-objective HPO** — native Pareto-front support for multi-metric
@@ -51,8 +54,8 @@ Key Features
 - **MLflow auto-logging** — set ``TrainConfig(mlflow=MLflowConfig(...))`` and the
   framework automatically logs params, metrics, dataset lineage, and registers the model
   after every run. No MLflow code required in your ``Trainer``.
-- **ONNX model export** — exports to ONNX by default; easily extended to any custom
-  format via ``export_model()``.
+- **Flexible model export** — ONNX / TFLite / Keras / joblib / JSON / NetCDF and
+  custom formats via ``export_model()``.
 
 ----
 
@@ -310,12 +313,12 @@ Precedence: **env var > explicit argument > default value**.
 Supported Training Scenarios
 ------------------------------
 
-The bundled test suite covers eight representative scenarios, all runnable via
+The bundled test suite covers **twelve** representative scenarios, all runnable via
 ``dry_run()`` without any external dependencies:
 
 .. list-table::
    :header-rows: 1
-   :widths: 8 30 30 32
+   :widths: 6 32 28 34
 
    * - #
      - Scenario
@@ -334,7 +337,7 @@ The bundled test suite covers eight representative scenarios, all runnable via
      - TensorFlow / Keras
      - Pillow preprocessing
    * - 4
-     - Gradient-boosted trees
+     - Gradient-boosted trees classification
      - scikit-learn
      - joblib serialisation
    * - 5
@@ -342,9 +345,9 @@ The bundled test suite covers eight representative scenarios, all runnable via
      - NumPy / scikit-learn
      - Pareto-front HPO
    * - 6
-     - Bayesian mixture model
-     - PyMC + ArviZ
-     - Posterior sampling
+     - Bayesian parameter inference
+     - PyMC
+     - NetCDF export
    * - 7
      - Hand-written logistic regression
      - Pure NumPy
@@ -353,6 +356,22 @@ The bundled test suite covers eight representative scenarios, all runnable via
      - Black-box external process
      - Subprocess
      - Wraps any CLI training command
+   * - 9
+     - Tabular regression
+     - scikit-learn
+     - Multi-objective (R2 + RMSE) selection
+   * - 10
+     - Time-series forecasting
+     - PyTorch (LSTM)
+     - Sequence modelling + ONNX export
+   * - 11
+     - Unsupervised anomaly detection
+     - scikit-learn (Isolation Forest)
+     - Multi-metric anomaly quality
+   * - 12
+     - Text classification
+     - PyTorch (TextCNN)
+     - NLP workflow + ONNX export
 
 ----
 
@@ -366,8 +385,14 @@ Development & Testing
    cd het-ai
    pip install -e ".[dev,examples]"
 
-   # Run the full test suite (8 dry-run smoke tests)
+   # Run the full test suite
    pytest tests/ -v
+
+   # Run scenario smoke tests only
+   pytest tests/cases -v
+
+The ``tests/cases`` directory currently contains **12** representative end-to-end
+dry-run scenarios for core workflow validation.
 
 ----
 
