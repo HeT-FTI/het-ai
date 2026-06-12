@@ -90,7 +90,7 @@ class BlackBoxTrainer(BaseTrainer):
             }, f)
 
         proc = subprocess.run(
-            ['./external_trainer',
+            ['./tests/external_trainer.py',
              '--config', config_path,
              '--output', output_path],
             capture_output=True,
