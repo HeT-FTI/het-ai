@@ -87,6 +87,19 @@ class BaseTrainer(ABC):
     def on_study_end(self, study: Any, best_trial: Any) -> dict:
         return {}
 
+    def before_mlflow_log(self, result: "TrainResult") -> "TrainResult":
+        """
+        训练结果在上传到 MLflow 之前的回调钩子。
+        子类可在这里修改 result 的值，例如追加 artifact_file_paths 或调整 metric_dict。
+
+        Args:
+            result: 即将交给 MLflow 上传的标准化结果对象。
+
+        Returns:
+            修改后的 result；也允许原地修改后直接返回同一个对象。
+        """
+        return result
+
     def on_model_registered(self, result: "TrainResult") -> None:
         """
         模型注册到 MLflow Model Registry 后的回调钩子。
@@ -208,15 +221,23 @@ class BaseTrainer(ABC):
 
     @staticmethod
     def _unpack_train_result(raw) -> tuple:
+        """解包 train() 返回值，支持三元返回。
+        
+        返回: (score, artifact, metrics_dict)
+        """
+        if isinstance(raw, tuple) and len(raw) == 3:
+            return raw[0], raw[1], raw[2]
         if isinstance(raw, tuple) and len(raw) == 2:
-            return raw[0], raw[1]
+            return raw[0], raw[1], None
         if isinstance(raw, (int, float, Result)):
-            return raw, None
+            return raw, None, None
         raise TypeError(
             f"train() 返回类型不合法: {type(raw)}\n"
             "合法返回值:\n"
-            "  float                   — 单目标\n"
-            "  (float, artifact)       — 单目标 + 导出产物\n"
-            "  Result(...)             — 多目标\n"
-            "  (Result(...), artifact) — 多目标 + 导出产物"
+            "  float                              — 单目标\n"
+            "  (float, artifact)                  — 单目标 + 导出产物\n"
+            "  (float, artifact, dict)            — 单目标 + 导出产物 + 自定义指标\n"
+            "  Result(...)                        — 多目标\n"
+            "  (Result(...), artifact)            — 多目标 + 导出产物\n"
+            "  (Result(...), artifact, dict)      — 多目标 + 导出产物 + 自定义指标"
         )

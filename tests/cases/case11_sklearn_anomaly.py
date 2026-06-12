@@ -7,8 +7,17 @@ import numpy as np
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics import f1_score, precision_score, recall_score
 from sklearn.preprocessing import StandardScaler
+from pathlib import Path
+import sys
 
-from het_ai.studio import BaseTrainer, DataBundle, TrainConfig
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from het_ai.mlflow import MLflowConfig
+from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
+
+
+def build_mlflow_config() -> MLflowConfig:
+    return MLflowConfig()
 
 
 class AnomalyDetectionTrainer(BaseTrainer):
@@ -21,6 +30,9 @@ class AnomalyDetectionTrainer(BaseTrainer):
     # ── 数据 ─────────────────────────────────────────────────────
 
     def load_data(self, dvc_data_root: str) -> DataBundle:
+        if dvc_data_root == '__mock__':
+            return self.mock_data()
+
         import pandas as pd
 
         df = pd.read_csv(
@@ -62,27 +74,62 @@ class AnomalyDetectionTrainer(BaseTrainer):
     )
     def train(self, data: DataBundle, n_estimators, max_samples,
               contamination, max_features):
+        from sklearn.model_selection import train_test_split
+
         X      = data.splits['all']['X']
         y_true = data.splits['all']['y']
+        X_train, X_val, y_train, y_val = train_test_split(
+            X,
+            y_true,
+            test_size=0.2,
+            random_state=self.config.random_state,
+            stratify=y_true,
+        )
 
         model = IsolationForest(
-            n_estimators=int(n_estimators),
+            n_estimators=1,
             max_samples=max_samples,
             contamination=contamination,
             max_features=max_features,
             random_state=self.config.random_state,
             n_jobs=-1,
+            warm_start=True,
         )
-        model.fit(X)
-        y_pred = model.predict(X)
 
-        f1  = f1_score(y_true, y_pred, pos_label=-1)
-        pre = precision_score(y_true, y_pred, pos_label=-1)
+        train_loss_history = []
+        val_loss_history = []
+        best_f1 = 0.0
+        best_pre = 0.0
+        for epoch in range(1, int(n_estimators) + 1):
+            model.set_params(n_estimators=epoch)
+            model.fit(X_train)
+
+            y_train_pred = model.predict(X_train)
+            y_val_pred = model.predict(X_val)
+            train_f1 = float(f1_score(y_train, y_train_pred, pos_label=-1))
+            val_f1 = float(f1_score(y_val, y_val_pred, pos_label=-1))
+            val_pre = float(precision_score(y_val, y_val_pred, pos_label=-1))
+            train_loss_history.append(float(1.0 - train_f1))
+            val_loss_history.append(float(1.0 - val_f1))
+
+            if val_f1 > best_f1:
+                best_f1 = val_f1
+                best_pre = val_pre
+
+            try:
+                should_stop = self.report(step=epoch - 1, value=val_f1)
+            except NotImplementedError:
+                should_stop = False
+            if should_stop:
+                break
 
         return BaseTrainer.Result(
-            f1=float(f1),
-            precision=float(pre),
-        ), model
+            f1=best_f1,
+            precision=best_pre,
+        ), model, {
+            'train_loss_history': train_loss_history,
+            'val_loss_history': val_loss_history,
+        }
 
     def select_best_trial(self, pareto_front):
         return max(
@@ -102,9 +149,22 @@ class AnomalyDetectionTrainer(BaseTrainer):
     def predict(self, model_path: str, inputs):
         return joblib.load(model_path).predict(inputs)
 
+    def before_mlflow_log(self, result: TrainResult):
+        # 在 MLflow 记录之前附加额外的文件或信息
+        result.artifact_file_paths.append("./tests/cases/case11_sklearn_anomaly.py")
+        return result
 
-def main(dvc_data_root: str = "dvc_data"):
-    config  = TrainConfig()
+def main(dvc_data_root: str = "__mock__", mlflow_config: MLflowConfig | None = None):
+    config  = TrainConfig(
+        n_trials=10,
+        mlflow=MLflowConfig(
+            tracking_uri="http://10.12.8.110:5000",
+            experiment_name="case11_sklearn_anomaly",
+        ),
+    )
     trainer = AnomalyDetectionTrainer(config)
-    trainer.dry_run(dvc_data_root)
-    return trainer.run(dvc_data_root).to_tuple()
+    result = trainer.run(dvc_data_root)
+    return result.to_tuple()
+
+if __name__ == "__main__":
+    print(main())

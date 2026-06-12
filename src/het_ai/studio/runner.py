@@ -66,6 +66,8 @@ class WorkflowRunner:
             data, best_trial, export_path, summary_path, extra_tags
         )
 
+        result = self.trainer.before_mlflow_log(result) or result
+
         mlflow_cfg = getattr(self.config, "mlflow", None)
         if mlflow_cfg is not None:
             from het_ai.mlflow.logger import MLflowRunLogger
@@ -134,10 +136,15 @@ class WorkflowRunner:
                 raw = trainer.train(data=data, **sampled)
 
                 from het_ai.studio.base import BaseTrainer
-                score, artifact = BaseTrainer._unpack_train_result(raw)
+                score, artifact, metrics_dict = BaseTrainer._unpack_train_result(raw)
 
                 trial.set_user_attr("__artifact__", artifact)
                 trial.set_user_attr("trial_params", sampled)
+
+                # 记录自定义指标（支持列表和标量）
+                if metrics_dict:
+                    for k, v in metrics_dict.items():
+                        trial.set_user_attr(f"metric_{k}", v)
 
                 if isinstance(score, Result):
                     for k, v in score.data.items():

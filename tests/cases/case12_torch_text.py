@@ -6,8 +6,17 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+from pathlib import Path
+import sys
 
-from het_ai.studio import BaseTrainer, DataBundle, TrainConfig
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from het_ai.mlflow import MLflowConfig
+from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
+
+
+def build_mlflow_config() -> MLflowConfig:
+    return MLflowConfig()
 
 
 class TextCNN(nn.Module):
@@ -36,6 +45,9 @@ class TextClassificationTrainer(BaseTrainer):
     # ── 数据 ─────────────────────────────────────────────────────
 
     def load_data(self, dvc_data_root: str) -> DataBundle:
+        if dvc_data_root == '__mock__':
+            return self.mock_data()
+
         import pandas as pd
         from sklearn.model_selection import train_test_split
 
@@ -122,31 +134,45 @@ class TextClassificationTrainer(BaseTrainer):
             dropout=dropout,
         )
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+        criterion = nn.CrossEntropyLoss()
         loader    = DataLoader(
             TensorDataset(data.X_train, data.y_train),
             batch_size=int(batch_size), shuffle=True,
         )
         best_acc = 0.0
+        train_loss_history = []
+        val_loss_history = []
 
         for epoch in range(int(epochs)):
             model.train()
+            train_loss_sum = 0.0
+            train_samples = 0
             for bx, by in loader:
-                loss = nn.CrossEntropyLoss()(model(bx), by)
+                loss = criterion(model(bx), by)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+                train_loss_sum += loss.item() * by.size(0)
+                train_samples += by.size(0)
+
+            train_loss = train_loss_sum / max(1, train_samples)
+            train_loss_history.append(float(train_loss))
 
             model.eval()
             with torch.no_grad():
-                acc = (
-                    model(data.X_val).argmax(1) == data.y_val
-                ).float().mean().item()
+                logits = model(data.X_val)
+                val_loss = criterion(logits, data.y_val).item()
+                val_loss_history.append(float(val_loss))
+                acc = (logits.argmax(1) == data.y_val).float().mean().item()
 
             best_acc = max(best_acc, acc)
             if self.report(step=epoch, value=acc):
                 break
 
-        return best_acc, model
+        return best_acc, model, {
+            'train_loss_history': train_loss_history,
+            'val_loss_history': val_loss_history,
+        }
 
     # ── 导出 ─────────────────────────────────────────────────────
 
@@ -175,9 +201,22 @@ class TextClassificationTrainer(BaseTrainer):
         sess = ort.InferenceSession(model_path)
         return sess.run(None, {'input_ids': inputs})[0]
 
+    def before_mlflow_log(self, result: TrainResult):
+        # 在 MLflow 记录之前附加额外的文件或信息
+        result.artifact_file_paths.append("./tests/cases/case12_torch_text.py")
+        return result
 
-def main(dvc_data_root: str = "dvc_data"):
-    config  = TrainConfig()
+def main(dvc_data_root: str = "__mock__", mlflow_config: MLflowConfig | None = None):
+    config  = TrainConfig(
+        n_trials=10,
+        mlflow=MLflowConfig(
+            tracking_uri="http://10.12.8.110:5000",
+            experiment_name="case12_torch_text",
+        ),
+    )
     trainer = TextClassificationTrainer(config)
-    trainer.dry_run(dvc_data_root)
-    return trainer.run(dvc_data_root).to_tuple()
+    result = trainer.run(dvc_data_root)
+    return result.to_tuple()
+
+if __name__ == "__main__":
+    print(main())

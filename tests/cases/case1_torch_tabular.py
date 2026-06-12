@@ -6,8 +6,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+from pathlib import Path
+from os.path import exists
+import sys
 
-from het_ai.studio import BaseTrainer, DataBundle, TrainConfig
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from het_ai.mlflow import MLflowConfig
+from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
 
 
 class SimpleNet(nn.Module):
@@ -28,13 +34,18 @@ class PytorchTabularTrainer(BaseTrainer):
     # ── 数据 ─────────────────────────────────────────────────────
 
     def load_data(self, dvc_data_root: str) -> DataBundle:
+        if dvc_data_root == '__mock__':
+            return self.mock_data()
+
+        data_path = f"{dvc_data_root}/repository_0/files/label_data/data.csv"
+        if not exists(data_path):
+            return self.mock_data()
+
         import pandas as pd
         from sklearn.model_selection import train_test_split
         from sklearn.preprocessing import StandardScaler
 
-        df     = pd.read_csv(
-            f"{dvc_data_root}/repository_0/files/label_data/data.csv"
-        )
+        df     = pd.read_csv(data_path)
         X      = StandardScaler().fit_transform(
             df.drop(columns=['label']).values.astype(np.float32)
         )
@@ -87,31 +98,55 @@ class PytorchTabularTrainer(BaseTrainer):
         optimizer = torch.optim.Adam(
             model.parameters(), lr=lr, weight_decay=weight_decay
         )
+        criterion = nn.CrossEntropyLoss()
         loader = DataLoader(
             TensorDataset(data.X_train, data.y_train),
             batch_size=int(batch_size), shuffle=True,
         )
         best_acc = 0.0
+        train_loss_history = []
+        val_loss_history = []
 
         for epoch in range(int(epochs)):
             model.train()
+            train_loss_sum = 0.0
+            train_samples = 0
             for bx, by in loader:
-                loss = nn.CrossEntropyLoss()(model(bx), by)
+                logits = model(bx)
+                loss = criterion(logits, by)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+                train_loss_sum += loss.item() * by.size(0)
+                train_samples += by.size(0)
+
+            train_loss = train_loss_sum / max(1, train_samples)
+            train_loss_history.append(float(train_loss))
 
             model.eval()
             with torch.no_grad():
-                acc = (
-                    model(data.X_val).argmax(1) == data.y_val
-                ).float().mean().item()
+                val_logits = model(data.X_val)
+                val_loss = criterion(val_logits, data.y_val).item()
+                val_loss_history.append(float(val_loss))
+                acc = (val_logits.argmax(1) == data.y_val).float().mean().item()
 
             best_acc = max(best_acc, acc)
             if self.report(step=epoch, value=acc):
                 break
 
-        return best_acc, model
+        # 获取trial编号和UUID
+        trial_num = self._trial_local.current.number if hasattr(self._trial_local, 'current') else -1
+        trial_dir = self._trial_local.current.user_attrs.get("trial_dir", "") if hasattr(self._trial_local, 'current') else ""
+        trial_uuid = Path(trial_dir).name if trial_dir else "unknown"
+        last_train_loss = train_loss_history[-1] if train_loss_history else 0.0
+        last_val_loss = val_loss_history[-1] if val_loss_history else 0.0
+        print(f"  Trial #{trial_num} ({trial_uuid}): lr={lr:.6f}, batch_size={batch_size}, epochs={epochs}, weight_decay={weight_decay:.6f} -> accuracy={best_acc:.4f}, train_loss={last_train_loss:.4f}, val_loss={last_val_loss:.4f}")
+        
+        # 返回三元组：目标值、模型、自定义指标
+        return best_acc, model, {
+            'train_loss_history': train_loss_history,
+            'val_loss_history': val_loss_history,
+        }
 
     # ── 导出 ─────────────────────────────────────────────────────
 
@@ -138,9 +173,23 @@ class PytorchTabularTrainer(BaseTrainer):
         sess = ort.InferenceSession(model_path)
         return sess.run(None, {'input': inputs})[0]
 
+    def before_mlflow_log(self, result: TrainResult):
+        # 在 MLflow 记录之前附加额外的文件或信息
+        result.artifact_file_paths.append("./tests/cases/case1_torch_tabular.py")
+        return result
 
-def main(dvc_data_root: str = "dvc_data"):
-    config  = TrainConfig()
+
+def main(dvc_data_root: str = "__mock__"):
+    config  = TrainConfig(
+        n_trials=10,
+        mlflow=MLflowConfig(
+            tracking_uri="http://10.12.8.110:5000",
+            experiment_name="case1_torch_tabular",
+        ),
+    )
     trainer = PytorchTabularTrainer(config)
-    trainer.dry_run(dvc_data_root)
-    return trainer.run(dvc_data_root).to_tuple()
+    result = trainer.run(dvc_data_root)
+    return result.to_tuple()
+
+if __name__ == "__main__":
+    print(main())

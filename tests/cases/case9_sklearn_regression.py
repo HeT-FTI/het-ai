@@ -7,8 +7,17 @@ import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import StandardScaler
+from pathlib import Path
+import sys
 
-from het_ai.studio import BaseTrainer, DataBundle, TrainConfig
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from het_ai.mlflow import MLflowConfig
+from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
+
+
+def build_mlflow_config() -> MLflowConfig:
+    return MLflowConfig()
 
 
 class SklearnRegressionTrainer(BaseTrainer):
@@ -21,6 +30,9 @@ class SklearnRegressionTrainer(BaseTrainer):
     # ── 数据 ─────────────────────────────────────────────────────
 
     def load_data(self, dvc_data_root: str) -> DataBundle:
+        if dvc_data_root == '__mock__':
+            return self.mock_data()
+
         import pandas as pd
         from sklearn.model_selection import train_test_split
 
@@ -41,7 +53,7 @@ class SklearnRegressionTrainer(BaseTrainer):
             },
             feature_list=df.drop(columns=['target']).columns.tolist(),
             target_list=['target'],
-            meta={'input_dim': X.shape[1]},
+            meta={'input_dim': X.shape[1], 'mock_mode': False},
         )
 
     def mock_data(self) -> DataBundle:
@@ -55,7 +67,7 @@ class SklearnRegressionTrainer(BaseTrainer):
             },
             feature_list=[f'f{i}' for i in range(5)],
             target_list=['target'],
-            meta={'input_dim': 5},
+            meta={'input_dim': 5, 'mock_mode': True},
         )
 
     # ── 训练 ─────────────────────────────────────────────────────
@@ -68,24 +80,55 @@ class SklearnRegressionTrainer(BaseTrainer):
     )
     def train(self, data: DataBundle, n_estimators, max_depth,
               min_samples_leaf, max_features):
+        total_estimators = int(n_estimators)
+        if getattr(self, '_in_dry_run', False):
+            total_estimators = min(total_estimators, 50)
+        if data.meta.get('mock_mode', False):
+            total_estimators = min(total_estimators, 20)
+
         model = RandomForestRegressor(
-            n_estimators=int(n_estimators),
+            n_estimators=1,
             max_depth=int(max_depth),
             min_samples_leaf=int(min_samples_leaf),
             max_features=max_features,
             random_state=self.config.random_state,
             n_jobs=-1,
+            warm_start=True,
         )
-        model.fit(data.X_train, data.y_train)
+        train_loss_history = []
+        val_loss_history = []
+        best_rmse = float('inf')
+        best_r2 = -float('inf')
 
-        y_pred = model.predict(data.X_val)
-        r2     = r2_score(data.y_val, y_pred)
-        rmse   = float(np.sqrt(mean_squared_error(data.y_val, y_pred)))
+        for epoch in range(1, total_estimators + 1):
+            model.set_params(n_estimators=epoch)
+            model.fit(data.X_train, data.y_train)
+
+            y_tr_pred = model.predict(data.X_train)
+            y_pred = model.predict(data.X_val)
+            train_rmse = float(np.sqrt(mean_squared_error(data.y_train, y_tr_pred)))
+            val_rmse = float(np.sqrt(mean_squared_error(data.y_val, y_pred)))
+            train_loss_history.append(train_rmse)
+            val_loss_history.append(val_rmse)
+            cur_r2 = float(r2_score(data.y_val, y_pred))
+            if val_rmse < best_rmse:
+                best_rmse = val_rmse
+                best_r2 = cur_r2
+
+            try:
+                should_stop = self.report(step=epoch - 1, value=-val_rmse)
+            except NotImplementedError:
+                should_stop = False
+            if should_stop:
+                break
 
         return BaseTrainer.Result(
-            r2=float(r2),
-            neg_rmse=-rmse,
-        ), model
+            r2=best_r2,
+            neg_rmse=-best_rmse,
+        ), model, {
+            'train_loss_history': train_loss_history,
+            'val_loss_history': val_loss_history,
+        }
 
     def select_best_trial(self, pareto_front):
         return max(
@@ -105,9 +148,26 @@ class SklearnRegressionTrainer(BaseTrainer):
     def predict(self, model_path: str, inputs):
         return joblib.load(model_path).predict(inputs)
 
+    def before_mlflow_log(self, result: TrainResult):
+        # 在 MLflow 记录之前附加额外的文件或信息
+        result.artifact_file_paths.append("./tests/cases/case9_sklearn_regression.py")
+        return result
 
-def main(dvc_data_root: str = "dvc_data"):
-    config  = TrainConfig()
+def main(dvc_data_root: str = "__mock__", mlflow_config: MLflowConfig | None = None):
+    n_trials = 10
+    if dvc_data_root == "__mock__":
+        n_trials = 3
+
+    config  = TrainConfig(
+        n_trials=n_trials,
+        mlflow=MLflowConfig(
+            tracking_uri="http://10.12.8.110:5000",
+            experiment_name="case9_sklearn_regression",
+        ),
+    )
     trainer = SklearnRegressionTrainer(config)
-    trainer.dry_run(dvc_data_root)
-    return trainer.run(dvc_data_root).to_tuple()
+    result = trainer.run(dvc_data_root)
+    return result.to_tuple()
+
+if __name__ == "__main__":
+    print(main())

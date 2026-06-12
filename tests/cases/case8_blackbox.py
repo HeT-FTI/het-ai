@@ -8,8 +8,18 @@ import os
 import shutil
 import subprocess
 import tempfile
+import numpy as np
+from pathlib import Path
+import sys
 
-from het_ai.studio import BaseTrainer, DataBundle, TrainConfig
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from het_ai.mlflow import MLflowConfig
+from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
+
+
+def build_mlflow_config() -> MLflowConfig:
+    return MLflowConfig()
 
 
 class BlackBoxTrainer(BaseTrainer):
@@ -17,6 +27,9 @@ class BlackBoxTrainer(BaseTrainer):
     # ── 数据 ─────────────────────────────────────────────────────
 
     def load_data(self, dvc_data_root: str) -> DataBundle:
+        if dvc_data_root == '__mock__':
+            return self.mock_data()
+
         data_path = (
             f"{dvc_data_root}/repository_0/files/label_data/data.csv"
         )
@@ -52,7 +65,14 @@ class BlackBoxTrainer(BaseTrainer):
         # ── dry_run 短路：跳过真实 subprocess 调用 ───────────────
         if getattr(self, '_in_dry_run', False):
             self._logger.info("[mock] 跳过外部进程，返回合成结果")
-            return 0.75, {'model_path': None, 'tmp_dir': None}
+            score = 0.75
+            epochs = 10
+            val_loss_history = np.linspace(0.5, 1.0 - score, epochs).tolist()
+            train_loss_history = [max(v - 0.02, 0.0) for v in val_loss_history]
+            return score, {'model_path': None, 'tmp_dir': None}, {
+                'train_loss_history': [float(v) for v in train_loss_history],
+                'val_loss_history': [float(v) for v in val_loss_history],
+            }
 
         # ── 生产路径 ──────────────────────────────────────────────
         tmp_dir     = tempfile.mkdtemp()
@@ -79,14 +99,27 @@ class BlackBoxTrainer(BaseTrainer):
 
         if proc.returncode != 0:
             self._logger.error(proc.stderr.decode())
-            return 0.0
+            return 0.0, None, {
+                'train_loss_history': [1.0],
+                'val_loss_history': [1.0],
+            }
 
         with open(output_path) as f:
             result = json.load(f)
 
-        return float(result['val_accuracy']), {
+        score = float(result['val_accuracy'])
+        train_loss_history = result.get('train_loss_history')
+        val_loss_history = result.get('val_loss_history')
+        if train_loss_history is None or val_loss_history is None:
+            loss = 1.0 - score
+            train_loss_history = [loss]
+            val_loss_history = [loss]
+        return score, {
             'model_path': result.get('model_path'),
             'tmp_dir':    tmp_dir,
+        }, {
+            'train_loss_history': [float(v) for v in train_loss_history],
+            'val_loss_history': [float(v) for v in val_loss_history],
         }
 
     # ── 导出 ─────────────────────────────────────────────────────
@@ -99,9 +132,22 @@ class BlackBoxTrainer(BaseTrainer):
         shutil.copy2(src, dst)
         return dst
 
+    def before_mlflow_log(self, result: TrainResult):
+        # 在 MLflow 记录之前附加额外的文件或信息
+        result.artifact_file_paths.append("./tests/cases/case8_blackbox.py")
+        return result
 
-def main(dvc_data_root: str = "dvc_data"):
-    config  = TrainConfig(timeout=3600.0)
+def main(dvc_data_root: str = "__mock__", mlflow_config: MLflowConfig | None = None):
+    config  = TrainConfig(
+        n_trials=10,
+        mlflow=MLflowConfig(
+            tracking_uri="http://10.12.8.110:5000",
+            experiment_name="case8_blackbox",
+        ),
+    )
     trainer = BlackBoxTrainer(config)
-    trainer.dry_run(dvc_data_root)
-    return trainer.run(dvc_data_root).to_tuple()
+    result = trainer.run(dvc_data_root)
+    return result.to_tuple()
+
+if __name__ == "__main__":
+    print(main())

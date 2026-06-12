@@ -5,8 +5,14 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+from pathlib import Path
+from os.path import exists
+import sys
 
-from het_ai.studio import BaseTrainer, DataBundle, TrainConfig
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from het_ai.mlflow import MLflowConfig
+from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
 
 
 class MultiHeadNet(nn.Module):
@@ -30,9 +36,15 @@ class MultiTargetTrainer(BaseTrainer):
         import pandas as pd
         from sklearn.model_selection import train_test_split
 
-        df  = pd.read_csv(
-            f"{dvc_data_root}/repository_0/files/label_data/data.csv"
-        )
+        data_path = f"{dvc_data_root}/repository_0/files/label_data/data.csv"
+        if not exists(data_path):
+            return self.mock_data()
+
+        df  = pd.read_csv(data_path)
+        required_cols = {'f1', 'f2', 'f3', 'f4', 'target_1', 'target_2'}
+        if not required_cols.issubset(set(df.columns)):
+            return self.mock_data()
+
         X   = torch.tensor(
             df[['f1', 'f2', 'f3', 'f4']].values, dtype=torch.float32
         )
@@ -104,9 +116,13 @@ class MultiTargetTrainer(BaseTrainer):
             batch_size=int(batch_size), shuffle=True,
         )
         best_accs = [0.0, 0.0]
+        train_loss_history = []
+        val_loss_history = []
 
         for epoch in range(int(epochs)):
             model.train()
+            train_loss_sum = 0.0
+            train_samples = 0
             for bx, by1, by2 in loader:
                 outs = model(bx)
                 loss = sum(
@@ -116,24 +132,41 @@ class MultiTargetTrainer(BaseTrainer):
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+                train_loss_sum += loss.item() * by1.size(0)
+                train_samples += by1.size(0)
+
+            train_loss = train_loss_sum / max(1, train_samples)
+            train_loss_history.append(float(train_loss))
 
             model.eval()
             val = data.splits['val']
             with torch.no_grad():
                 outs = model(val['X'])
+                val_loss = sum(
+                    w * nn.CrossEntropyLoss()(o, y)
+                    for w, o, y in zip(loss_w, outs, [val['y1'], val['y2']])
+                )
+                val_loss_history.append(float(val_loss.item()))
                 accs = [
                     (o.argmax(1) == y).float().mean().item()
                     for o, y in zip(outs, [val['y1'], val['y2']])
                 ]
             best_accs = [max(b, a) for b, a in zip(best_accs, accs)]
 
-            if self.report(step=epoch, value=sum(accs) / len(accs)):
-                break
+            # Optuna 的 multi-objective trial 不支持 report/pruning。
+            try:
+                if self.report(step=epoch, value=sum(accs) / len(accs)):
+                    break
+            except NotImplementedError:
+                pass
 
         return BaseTrainer.Result(
             acc_target_1=best_accs[0],
             acc_target_2=best_accs[1],
-        ), model
+        ), model, {
+            'train_loss_history': train_loss_history,
+            'val_loss_history': val_loss_history,
+        }
 
     def select_best_trial(self, pareto_front):
         return max(
@@ -159,10 +192,24 @@ class MultiTargetTrainer(BaseTrainer):
             },
         )
         return path
+    
+    def before_mlflow_log(self, result: TrainResult):
+        # 在 MLflow 记录之前附加额外的文件或信息
+        result.artifact_file_paths.append("./tests/cases/case2_torch_multitarget.py")
+        return result
 
 
-def main(dvc_data_root: str = "dvc_data"):
-    config  = TrainConfig()
+def main(dvc_data_root: str = "__mock__",):
+    config  = TrainConfig(
+        n_trials=10,
+        mlflow=MLflowConfig(
+            tracking_uri="http://10.12.8.110:5000",
+            experiment_name="case2_torch_multitarget",
+        ),
+    )
     trainer = MultiTargetTrainer(config)
-    trainer.dry_run(dvc_data_root)
-    return trainer.run(dvc_data_root).to_tuple()
+    result = trainer.run(dvc_data_root)
+    return result.to_tuple()
+
+if __name__ == "__main__":
+    print(main())

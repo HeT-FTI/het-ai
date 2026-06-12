@@ -6,8 +6,17 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+from pathlib import Path
+import sys
 
-from het_ai.studio import BaseTrainer, DataBundle, TrainConfig
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from het_ai.mlflow import MLflowConfig
+from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
+
+
+def build_mlflow_config() -> MLflowConfig:
+    return MLflowConfig()
 
 
 class LSTMForecaster(nn.Module):
@@ -39,6 +48,9 @@ class TimeSeriesTrainer(BaseTrainer):
         return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
 
     def load_data(self, dvc_data_root: str) -> DataBundle:
+        if dvc_data_root == '__mock__':
+            return self.mock_data()
+
         import pandas as pd
 
         df     = pd.read_csv(
@@ -118,25 +130,38 @@ class TimeSeriesTrainer(BaseTrainer):
             batch_size=int(batch_size), shuffle=True,
         )
         best_mse = float('inf')
+        train_loss_history = []
+        val_loss_history = []
 
         for epoch in range(int(epochs)):
             model.train()
+            train_loss_sum = 0.0
+            train_samples = 0
             for bx, by in loader:
                 loss = criterion(model(bx), by)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+                train_loss_sum += loss.item() * by.size(0)
+                train_samples += by.size(0)
+
+            train_mse = train_loss_sum / max(1, train_samples)
+            train_loss_history.append(float(train_mse))
 
             model.eval()
             with torch.no_grad():
                 val_pred = model(data.X_val)
                 val_mse  = criterion(val_pred, data.y_val).item()
+                val_loss_history.append(float(val_mse))
 
             best_mse = min(best_mse, val_mse)
             if self.report(step=epoch, value=val_mse):
                 break
 
-        return -best_mse, model     # 取负数以 maximize
+        return -best_mse, model, {
+            'train_loss_history': train_loss_history,
+            'val_loss_history': val_loss_history,
+        }     # 取负数以 maximize
 
     # ── 导出 ─────────────────────────────────────────────────────
 
@@ -162,9 +187,22 @@ class TimeSeriesTrainer(BaseTrainer):
         sess = ort.InferenceSession(model_path)
         return sess.run(None, {'input': inputs})[0]
 
+    def before_mlflow_log(self, result: TrainResult):
+        # 在 MLflow 记录之前附加额外的文件或信息
+        result.artifact_file_paths.append("./tests/cases/case10_torch_timeseries.py")
+        return result
 
-def main(dvc_data_root: str = "dvc_data"):
-    config  = TrainConfig(direction='maximize')
+def main(dvc_data_root: str = "__mock__", mlflow_config: MLflowConfig | None = None):
+    config  = TrainConfig(
+        n_trials=10,
+        mlflow=MLflowConfig(
+            tracking_uri="http://10.12.8.110:5000",
+            experiment_name="case10_torch_timeseries",
+        ),
+    )
     trainer = TimeSeriesTrainer(config)
-    trainer.dry_run(dvc_data_root)
-    return trainer.run(dvc_data_root).to_tuple()
+    result = trainer.run(dvc_data_root)
+    return result.to_tuple()
+
+if __name__ == "__main__":
+    print(main())

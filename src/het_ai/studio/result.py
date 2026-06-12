@@ -22,6 +22,25 @@ class TrainResult:
 
     trainer: Optional["BaseTrainer"] = field(default=None, repr=False)
 
+    def __getitem__(self, key: str) -> Any:
+        if not hasattr(self, key):
+            raise KeyError(key)
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        if not hasattr(self, key):
+            raise KeyError(key)
+        setattr(self, key, value)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+    def update(self, **kwargs: Any) -> None:
+        for key, value in kwargs.items():
+            if not hasattr(self, key):
+                raise KeyError(key)
+            setattr(self, key, value)
+
     def to_tuple(self) -> Tuple:
         return (
             self.tag_dict,

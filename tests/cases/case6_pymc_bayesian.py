@@ -89,8 +89,17 @@
 3. 优化指标改为 posterior sample_stats 中 lp 的均值（越大越好）。
 """
 import numpy as np
+from pathlib import Path
+import sys
 
-from het_ai.studio import BaseTrainer, DataBundle, TrainConfig
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from het_ai.mlflow import MLflowConfig
+from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
+
+
+def build_mlflow_config() -> MLflowConfig:
+    return MLflowConfig()
 
 
 class BayesianMixtureTrainer(BaseTrainer):
@@ -98,6 +107,9 @@ class BayesianMixtureTrainer(BaseTrainer):
     # ── 数据 ─────────────────────────────────────────────────────
 
     def load_data(self, dvc_data_root: str) -> DataBundle:
+        if dvc_data_root == '__mock__':
+            return self.mock_data()
+
         import pandas as pd
 
         df = pd.read_csv(
@@ -148,8 +160,15 @@ class BayesianMixtureTrainer(BaseTrainer):
     )
     def train(self, data: DataBundle, mu_sigma, sigma_prior, draws, tune):
         import pymc as pm
+        from sklearn.model_selection import train_test_split
 
         obs = data.splits["all"]["obs"]
+        obs_train, obs_val = train_test_split(
+            obs,
+            test_size=0.2,
+            random_state=self.config.random_state,
+            shuffle=True,
+        )
 
         # ── dry_run 模式下自动缩小采样规模，提升测试速度 ───────────
         if getattr(self, "_in_dry_run", False):
@@ -166,7 +185,7 @@ class BayesianMixtureTrainer(BaseTrainer):
         with pm.Model():
             mu = pm.Normal("mu", mu=0.0, sigma=mu_sigma)
             sigma = pm.HalfNormal("sigma", sigma=sigma_prior)
-            _ = pm.Normal("obs", mu=mu, sigma=sigma, observed=obs)
+            _ = pm.Normal("obs", mu=mu, sigma=sigma, observed=obs_train)
 
             idata = pm.sample(
                 draws=draws,
@@ -180,7 +199,30 @@ class BayesianMixtureTrainer(BaseTrainer):
             )
 
         score = self._score_inferencedata(idata)
-        return score, idata
+        mu_samples = idata.posterior["mu"].values.reshape(-1)
+        sigma_samples = np.clip(
+            idata.posterior["sigma"].values.reshape(-1),
+            1e-6,
+            None,
+        )
+
+        def _nll(x, mu, sigma):
+            return 0.5 * np.log(2.0 * np.pi * sigma * sigma) + 0.5 * ((x - mu) / sigma) ** 2
+
+        train_loss_history = []
+        val_loss_history = []
+        for epoch, (mu_s, sigma_s) in enumerate(zip(mu_samples, sigma_samples)):
+            train_loss = float(np.mean(_nll(obs_train, mu_s, sigma_s)))
+            val_loss = float(np.mean(_nll(obs_val, mu_s, sigma_s)))
+            train_loss_history.append(train_loss)
+            val_loss_history.append(val_loss)
+            if self.report(step=epoch, value=-val_loss):
+                break
+
+        return score, idata, {
+            'train_loss_history': train_loss_history,
+            'val_loss_history': val_loss_history,
+        }
 
     # ── 导出 ─────────────────────────────────────────────────────
 
@@ -188,8 +230,19 @@ class BayesianMixtureTrainer(BaseTrainer):
         if artifact is None:
             return export_dir
         path = f"{export_dir}/inference_data.nc"
-        artifact.to_netcdf(path)
-        return path
+        try:
+            artifact.to_netcdf(path, engine="scipy")
+            return path
+        except Exception:
+            # Fall back to a lightweight NumPy archive if NetCDF backends are unavailable.
+            fallback_path = f"{export_dir}/inference_data_fallback.npz"
+            np.savez_compressed(
+                fallback_path,
+                mu=artifact.posterior["mu"].values,
+                sigma=artifact.posterior["sigma"].values,
+                lp=artifact.sample_stats["lp"].values,
+            )
+            return fallback_path
 
     def on_study_end(self, study, best_trial) -> dict:
         return {
@@ -197,9 +250,22 @@ class BayesianMixtureTrainer(BaseTrainer):
             "metric": "mean_log_posterior",
         }
 
+    def before_mlflow_log(self, result: TrainResult):
+        # 在 MLflow 记录之前附加额外的文件或信息
+        result.artifact_file_paths.append("./tests/cases/case6_pymc_bayesian.py")
+        return result
 
-def main(dvc_data_root: str = "dvc_data"):
-    config = TrainConfig(direction="maximize")
+def main(dvc_data_root: str = "__mock__", mlflow_config: MLflowConfig | None = None):
+    config  = TrainConfig(
+        n_trials=10,
+        mlflow=MLflowConfig(
+            tracking_uri="http://10.12.8.110:5000",
+            experiment_name="case6_pymc_bayesian",
+        ),
+    )
     trainer = BayesianMixtureTrainer(config)
-    trainer.dry_run(dvc_data_root)
-    return trainer.run(dvc_data_root).to_tuple()
+    result = trainer.run(dvc_data_root)
+    return result.to_tuple()
+
+if __name__ == "__main__":
+    print(main())

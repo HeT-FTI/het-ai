@@ -5,11 +5,16 @@
 import joblib
 import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, log_loss
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from pathlib import Path
+import sys
 
-from het_ai.studio import BaseTrainer, DataBundle, TrainConfig
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from het_ai.mlflow import MLflowConfig
+from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
 
 
 class SklearnGBTrainer(BaseTrainer):
@@ -17,6 +22,9 @@ class SklearnGBTrainer(BaseTrainer):
     # ── 数据 ─────────────────────────────────────────────────────
 
     def load_data(self, dvc_data_root: str) -> DataBundle:
+        if dvc_data_root == '__mock__':
+            return self.mock_data()
+
         import pandas as pd
         from sklearn.model_selection import train_test_split
 
@@ -76,10 +84,32 @@ class SklearnGBTrainer(BaseTrainer):
             )),
         ])
         pipe.fit(data.X_train, data.y_train)
+
+        scaler = pipe.named_steps['scaler']
+        clf = pipe.named_steps['clf']
+        X_train_scaled = scaler.transform(data.X_train)
+        X_val_scaled = scaler.transform(data.X_val)
+
+        train_loss_history = []
+        val_loss_history = []
+        for train_proba, val_proba in zip(
+            clf.staged_predict_proba(X_train_scaled),
+            clf.staged_predict_proba(X_val_scaled),
+        ):
+            train_loss_history.append(float(log_loss(
+                data.y_train, train_proba, labels=clf.classes_
+            )))
+            val_loss_history.append(float(log_loss(
+                data.y_val, val_proba, labels=clf.classes_
+            )))
+
         score = f1_score(
             data.y_val, pipe.predict(data.X_val), average='weighted'
         )
-        return score, pipe
+        return score, pipe, {
+            'train_loss_history': train_loss_history,
+            'val_loss_history': val_loss_history,
+        }
 
     # ── 导出 ─────────────────────────────────────────────────────
 
@@ -93,9 +123,22 @@ class SklearnGBTrainer(BaseTrainer):
     def predict(self, model_path: str, inputs):
         return joblib.load(model_path).predict(inputs)
 
+    def before_mlflow_log(self, result: TrainResult):
+        # 在 MLflow 记录之前附加额外的文件或信息
+        result.artifact_file_paths.append("./tests/cases/case4_sklearn_gbt.py")
+        return result
 
-def main(dvc_data_root: str = "dvc_data"):
-    config  = TrainConfig()
+def main(dvc_data_root: str = "__mock__", mlflow_config: MLflowConfig | None = None):
+    config  = TrainConfig(
+        n_trials=10,
+        mlflow=MLflowConfig(
+            tracking_uri="http://10.12.8.110:5000",
+            experiment_name="case4_sklearn_gbt",
+        ),
+    )
     trainer = SklearnGBTrainer(config)
-    trainer.dry_run(dvc_data_root)
-    return trainer.run(dvc_data_root).to_tuple()
+    result = trainer.run(dvc_data_root)
+    return result.to_tuple()
+
+if __name__ == "__main__":
+    print(main())

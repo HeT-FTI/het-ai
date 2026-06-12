@@ -4,8 +4,17 @@
 """
 import json
 import numpy as np
+from pathlib import Path
+import sys
 
-from het_ai.studio import BaseTrainer, DataBundle, TrainConfig
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from het_ai.mlflow import MLflowConfig
+from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
+
+
+def build_mlflow_config() -> MLflowConfig:
+    return MLflowConfig()
 
 
 class NumpyLogisticTrainer(BaseTrainer):
@@ -13,6 +22,9 @@ class NumpyLogisticTrainer(BaseTrainer):
     # ── 数据 ─────────────────────────────────────────────────────
 
     def load_data(self, dvc_data_root: str) -> DataBundle:
+        if dvc_data_root == '__mock__':
+            return self.mock_data()
+
         import pandas as pd
         from sklearn.model_selection import train_test_split
         from sklearn.preprocessing import LabelEncoder, StandardScaler
@@ -81,6 +93,8 @@ class NumpyLogisticTrainer(BaseTrainer):
         b        = np.zeros(C)
         best_acc = 0.0
         best_W, best_b = W.copy(), b.copy()
+        train_loss_history = []
+        val_loss_history = []
 
         for epoch in range(int(epochs)):
             idx = rng.permutation(n)
@@ -100,6 +114,13 @@ class NumpyLogisticTrainer(BaseTrainer):
                 self._softmax(X_val @ W + b).argmax(axis=1) == y_val
             ).mean()
 
+            train_probs = self._softmax(X_tr @ W + b)
+            val_probs = self._softmax(X_val @ W + b)
+            train_loss = -np.log(train_probs[np.arange(len(y_tr)), y_tr] + 1e-12).mean()
+            val_loss = -np.log(val_probs[np.arange(len(y_val)), y_val] + 1e-12).mean()
+            train_loss_history.append(float(train_loss))
+            val_loss_history.append(float(val_loss))
+
             if val_acc > best_acc:
                 best_acc       = val_acc
                 best_W, best_b = W.copy(), b.copy()
@@ -107,7 +128,10 @@ class NumpyLogisticTrainer(BaseTrainer):
             if self.report(step=epoch, value=val_acc):
                 break
 
-        return best_acc, {'W': best_W, 'b': best_b}
+        return best_acc, {'W': best_W, 'b': best_b}, {
+            'train_loss_history': train_loss_history,
+            'val_loss_history': val_loss_history,
+        }
 
     # ── 导出 ─────────────────────────────────────────────────────
 
@@ -128,9 +152,22 @@ class NumpyLogisticTrainer(BaseTrainer):
         b = np.array(w['b'])
         return self._softmax(inputs @ W + b).argmax(axis=1)
 
+    def before_mlflow_log(self, result: TrainResult):
+        # 在 MLflow 记录之前附加额外的文件或信息
+        result.artifact_file_paths.append("./tests/cases/case7_numpy_logistic.py")
+        return result
 
-def main(dvc_data_root: str = "dvc_data"):
-    config  = TrainConfig()
+def main(dvc_data_root: str = "__mock__", mlflow_config: MLflowConfig | None = None):
+    config  = TrainConfig(
+        n_trials=10,
+        mlflow=MLflowConfig(
+            tracking_uri="http://10.12.8.110:5000",
+            experiment_name="case7_numpy_logistic",
+        ),
+    )
     trainer = NumpyLogisticTrainer(config)
-    trainer.dry_run(dvc_data_root)
-    return trainer.run(dvc_data_root).to_tuple()
+    result = trainer.run(dvc_data_root)
+    return result.to_tuple()
+
+if __name__ == "__main__":
+    print(main())
