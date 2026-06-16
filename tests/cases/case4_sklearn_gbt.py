@@ -8,11 +8,6 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.metrics import f1_score, log_loss
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-
 from het_ai.mlflow import MLflowConfig
 from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
 

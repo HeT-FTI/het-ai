@@ -6,18 +6,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-
 from het_ai.mlflow import MLflowConfig
 from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
-
-
-def build_mlflow_config() -> MLflowConfig:
-    return MLflowConfig()
-
 
 class LSTMForecaster(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int,

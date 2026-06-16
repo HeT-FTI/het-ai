@@ -7,18 +7,8 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.metrics import calinski_harabasz_score, silhouette_score
 from sklearn.preprocessing import StandardScaler
-from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-
 from het_ai.mlflow import MLflowConfig
 from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
-
-
-def build_mlflow_config() -> MLflowConfig:
-    return MLflowConfig()
-
 
 class ClusteringTrainer(BaseTrainer):
 

@@ -89,18 +89,8 @@
 3. 优化指标改为 posterior sample_stats 中 lp 的均值（越大越好）。
 """
 import numpy as np
-from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-
 from het_ai.mlflow import MLflowConfig
 from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
-
-
-def build_mlflow_config() -> MLflowConfig:
-    return MLflowConfig()
-
 
 class BayesianMixtureTrainer(BaseTrainer):
 

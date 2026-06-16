@@ -4,18 +4,8 @@
 """
 import json
 import numpy as np
-from pathlib import Path
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-
 from het_ai.mlflow import MLflowConfig
 from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
-
-
-def build_mlflow_config() -> MLflowConfig:
-    return MLflowConfig()
-
 
 class NumpyLogisticTrainer(BaseTrainer):
 

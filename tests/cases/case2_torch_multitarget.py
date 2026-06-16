@@ -5,12 +5,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from pathlib import Path
 from os.path import exists
-import sys
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-
 from het_ai.mlflow import MLflowConfig
 from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
 
