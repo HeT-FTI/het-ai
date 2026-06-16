@@ -1,0 +1,10 @@
+# Sphinx documentation dependencies for het-ai
+# Install: pip install -r docs/requirements.txt
+sphinx>=7.2
+furo>=2024.0
+myst-parser>=3.0
+sphinx-copybutton>=0.5
+sphinx-autodoc-typehints>=2.0
+sphinx-design>=0.6
+sphinxcontrib-kroki>=1.3
+
