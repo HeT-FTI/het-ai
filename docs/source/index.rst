@@ -58,7 +58,7 @@ through a single, consistent interface, regardless of your ML framework.
         custom export, post-training hooks, and parallel trials.
 
     .. grid-item-card::
-        :link: examples/index
+        :link: examples/cases
         :link-type: doc
 
         📚 Examples

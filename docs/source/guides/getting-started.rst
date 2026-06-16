@@ -137,6 +137,6 @@ Next Steps
 ----------
 
 - :doc:`core-concepts` — deep dive into the architecture
-- :doc:`../examples/index` — 12 end-to-end examples across frameworks and tasks
+- :doc:`../examples/cases` — 12 end-to-end examples across frameworks and tasks
 - :doc:`advanced` — multi-objective, pruning, custom hooks, parallel trials
 
