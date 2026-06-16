@@ -103,7 +103,7 @@ from het_ai.studio import TrainConfig
 
 from tests.cases.case1_torch_tabular import PytorchTabularTrainer
 from tests.cases.case2_torch_multitarget import MultiTargetTrainer
-from tests.cases.case3_tf_image import TFImageTrainer
+from tests.cases.case3_tflite_image import TFImageTrainer
 from tests.cases.case4_sklearn_gbt import SklearnGBTrainer
 from tests.cases.case5_clustering import ClusteringTrainer
 from tests.cases.case6_pymc_bayesian import BayesianMixtureTrainer

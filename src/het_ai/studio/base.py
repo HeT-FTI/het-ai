@@ -191,7 +191,7 @@ class BaseTrainer(ABC):
         finally:
             self._in_dry_run = False
 
-        score, artifact = self._unpack_train_result(raw)
+        score, artifact, _metrics = self._unpack_train_result(raw)
         self._logger.info(
             f"[dry_run] ③ train() 完成  score={score}  elapsed={elapsed:.2f}s"
         )
