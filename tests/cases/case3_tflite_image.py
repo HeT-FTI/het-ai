@@ -258,12 +258,12 @@ class TFImageTrainer(BaseTrainer):
             dvc_config = DVCConfig(
                 github_repo='https://github.com/qshixing/food_segmentation_data.git',
                 github_token='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',
-                minio_endpoint='10.12.8.110:9000',
-                minio_access_key='admin',
-                minio_secret_key='het@1234',
-                minio_bucket='dvc-store',
-                minio_virtual_folder='food_segmentation_data',
-                minio_secure=False,
+                seaweedfs_endpoint='10.12.8.110:8333',
+                seaweedfs_access_key='admin',
+                seaweedfs_secret_key='het@1234',
+                seaweedfs_bucket='dvc-store',
+                seaweedfs_virtual_folder='food_segmentation_data',
+                seaweedfs_secure=False,
             )
             loader = DVCLoader(dvc_config)
             local_root = Path('dvc_data')

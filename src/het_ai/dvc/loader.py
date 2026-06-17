@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Protocol, Tuple, runtime_checkable
 
 import requests
-from minio import Minio
 
 from het_ai.dvc.config import DVCConfig
 from het_ai.studio.bundle import DataBundle
@@ -133,7 +132,7 @@ class FixedTagResolver:
     固定版本解析器：直接使用指定的 tag，不通过 GitHub API 解析最新版本。
 
     注意：此 Resolver 仅跳过 tag 解析步骤，DVCLoader.pull() 仍需网络访问
-    GitHub 下载 .dvc 指针文件并从 MinIO 拉取实际数据。
+    GitHub 下载 .dvc 指针文件并从 SeaweedFS(S3) 拉取实际数据。
     若需完全离线运行，应跳过 pull() 直接使用已缓存的本地数据。
 
     适用场景：
@@ -180,12 +179,6 @@ class DVCLoader:
     ):
         self.config = config
         self._resolver = tag_resolver or GitHubTagResolver(config)
-        # self._minio = Minio(
-        #     endpoint=config.minio_endpoint,
-        #     access_key=config.minio_access_key,
-        #     secret_key=config.minio_secret_key,
-        #     secure=config.minio_secure,
-        # )
         self._session = requests.Session()
         self._session.headers.update({
             "Authorization": f"token {config.github_token}",
@@ -201,17 +194,6 @@ class DVCLoader:
             if config.github_repo else ""
         )
 
-        # MinIO 客户端仅在 endpoint 非空时初始化（FixedTagResolver 场景下可能不需要）
-        self._minio = (
-            Minio(
-                endpoint=config.minio_endpoint,
-                access_key=config.minio_access_key,
-                secret_key=config.minio_secret_key,
-                secure=config.minio_secure,
-            )
-            if config.minio_endpoint else None
-        )
-
     # ── 公共接口 ──────────────────────────────────────────────────────────────
 
     def pull(self, output_path: Path) -> Tuple[str, str]:
@@ -219,7 +201,7 @@ class DVCLoader:
         完整数据拉取流程：
           1. 通过 TagResolver 确定数据版本 tag
           2. 从 GitHub 下载 .dvc 指针文件
-          3. 配置 DVC remote（MinIO），执行 dvc pull + checkout
+          3. 配置 DVC remote（SeaweedFS S3），执行 dvc pull + checkout
           4. 返回 (tag, commit_sha) 供 enrich_bundle 使用
         """
         tag, commit_sha = self._resolver.resolve()
@@ -249,7 +231,7 @@ class DVCLoader:
                 )
 
         if fail == len(dvc_files):
-            raise RuntimeError("所有 .dvc 文件均拉取失败，请检查 MinIO / GitHub 配置。")
+            raise RuntimeError("所有 .dvc 文件均拉取失败，请检查 SeaweedFS / GitHub 配置。")
 
         return tag, commit_sha
 
@@ -261,11 +243,7 @@ class DVCLoader:
             "dvc_version":    tag,
             "dvc_commit_sha": commit_sha,
             "dvc_repo":       self.config.github_repo,
-            # "dvc_remote":     (
-            #     f"s3://{self.config.minio_bucket}"
-            #     f"/{self.config.minio_virtual_folder}".rstrip("/")
-            # ),
-            "dvc_remote": f"s3://{self.config.minio_bucket}/{self.config.minio_virtual_folder}".rstrip("/")
+            "dvc_remote": f"s3://{self.config.seaweedfs_bucket}/{self.config.seaweedfs_virtual_folder}".rstrip("/")
         })
         return bundle
 
@@ -311,24 +289,16 @@ class DVCLoader:
 
     def _dvc_pull(self, dvc_file: Path) -> None:
         """配置 DVC remote 并拉取实际数据到本地。"""
-        # remote_url = (
-        #     f"s3://{self.config.minio_bucket}"
-        #     f"/{self.config.minio_virtual_folder}".rstrip("/")
-        # )
-        remote_url = f"s3://{self.config.minio_bucket}/{self.config.minio_virtual_folder}".rstrip("/")
-        # endpoint_url = (
-        #     f"{'https' if self.config.minio_secure else 'http'}://"
-        #     f"{self.config.minio_endpoint}"
-        # )
-        endpoint_url = f"{'https' if self.config.minio_secure else 'http'}://{self.config.minio_endpoint}"
+        remote_url = f"s3://{self.config.seaweedfs_bucket}/{self.config.seaweedfs_virtual_folder}".rstrip("/")
+        endpoint_url = f"{'https' if self.config.seaweedfs_secure else 'http'}://{self.config.seaweedfs_endpoint}"
         commands = [
             ["dvc", "init", "--no-scm", "-f"],
-            ["dvc", "remote", "add", "-d", "minio", remote_url, "-f"],
-            ["dvc", "remote", "modify", "minio", "endpointurl", endpoint_url],
-            ["dvc", "remote", "modify", "minio", "access_key_id",
-             self.config.minio_access_key],
-            ["dvc", "remote", "modify", "minio", "secret_access_key",
-             self.config.minio_secret_key],
+            ["dvc", "remote", "add", "-d", "seaweedfs", remote_url, "-f"],
+            ["dvc", "remote", "modify", "seaweedfs", "endpointurl", endpoint_url],
+            ["dvc", "remote", "modify", "seaweedfs", "access_key_id",
+             self.config.seaweedfs_access_key],
+            ["dvc", "remote", "modify", "seaweedfs", "secret_access_key",
+             self.config.seaweedfs_secret_key],
             ["dvc", "pull", str(dvc_file), "--force"],
             ["dvc", "checkout", "--force", "--with-deps"],
         ]

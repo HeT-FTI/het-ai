@@ -48,8 +48,8 @@ Key Features
   overridden by an environment variable, making container and CI/CD integration seamless.
 - **Dry-run validation** — verify the entire pipeline locally without production data
   or a remote training server using a single ``trainer.dry_run()`` call.
-- **DVC + MinIO integration** — ``het_ai.dvc`` resolves the latest data version tag from
-  GitHub, pulls actual data from MinIO via DVC, and injects version metadata into the
+- **DVC + SeaweedFS integration** — ``het_ai.dvc`` resolves the latest data version tag from
+  GitHub, pulls actual data from SeaweedFS via DVC, and injects version metadata into the
   ``DataBundle`` for downstream traceability.
 - **MLflow auto-logging** — set ``TrainConfig(mlflow=MLflowConfig(...))`` and the
   framework automatically logs params, metrics, dataset lineage, and registers the model
@@ -169,7 +169,7 @@ from a data version tag to a registered model — fully automatically.
            ...
 
        def load_data(self, dvc_data_root: str) -> DataBundle:
-           # Pull versioned data: GitHub tag → MinIO → local
+           # Pull versioned data: GitHub tag → SeaweedFS → local
            loader = DVCLoader(self.config.dvc or DVCConfig())
            tag, sha = loader.pull(Path(dvc_data_root))
 
@@ -189,7 +189,7 @@ from a data version tag to a registered model — fully automatically.
 
    config = TrainConfig(
        n_trials=100,
-       dvc=DVCConfig(),        # reads DVC_GITHUB_* and MINIO_* env vars
+      dvc=DVCConfig(),        # reads DVC_GITHUB_* and SEAWEEDFS_* env vars
        mlflow=MLflowConfig(    # reads MLFLOW_TRACKING_URI and MLFLOW_EXPERIMENT
            experiment_name="my-project",
        ),
@@ -210,10 +210,10 @@ The minimum required environment variables for the full platform:
    # DVC / GitHub
    export DVC_GITHUB_REPO=org/data-repo
    export DVC_GITHUB_TOKEN=ghp_xxxxxxxxxxxx
-   export MINIO_ENDPOINT=minio.internal:9000
-   export MINIO_ACCESS_KEY=minioadmin
-   export MINIO_SECRET_KEY=minioadmin
-   export MINIO_BUCKET=dvc-store
+  export SEAWEEDFS_ENDPOINT=seaweedfs.internal:8333
+  export SEAWEEDFS_ACCESS_KEY=admin
+  export SEAWEEDFS_SECRET_KEY=change-me
+  export SEAWEEDFS_BUCKET=dvc-store
 
    # MLflow
    export MLFLOW_TRACKING_URI=http://mlflow.internal:5000

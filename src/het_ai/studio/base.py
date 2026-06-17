@@ -120,12 +120,12 @@ class BaseTrainer(ABC):
         dvc_cfg = getattr(self.config, "dvc", None)
         if dvc_cfg is not None:
             missing = []
-            if not getattr(dvc_cfg, "minio_endpoint", ""):
-                missing.append("dvc.minio_endpoint")
-            if not getattr(dvc_cfg, "minio_access_key", ""):
-                missing.append("dvc.minio_access_key")
-            if not getattr(dvc_cfg, "minio_secret_key", ""):
-                missing.append("dvc.minio_secret_key")
+            if not getattr(dvc_cfg, "seaweedfs_endpoint", ""):
+                missing.append("dvc.seaweedfs_endpoint")
+            if not getattr(dvc_cfg, "seaweedfs_access_key", ""):
+                missing.append("dvc.seaweedfs_access_key")
+            if not getattr(dvc_cfg, "seaweedfs_secret_key", ""):
+                missing.append("dvc.seaweedfs_secret_key")
             if not getattr(dvc_cfg, "github_repo", ""):
                 missing.append("dvc.github_repo")
             if not getattr(dvc_cfg, "github_token", ""):

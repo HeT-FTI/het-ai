@@ -71,7 +71,6 @@ examples = [
 
 dvc = [
     "dvc>=3.0.0",
-    "minio>=7.0.0",
     "requests>=2.28.0",
 ]
 mlflow = [
@@ -80,7 +79,6 @@ mlflow = [
 # all-in-one 安装
 platform = [
     "dvc>=3.0.0",
-    "minio>=7.0.0",
     "requests>=2.28.0",
     "mlflow>=2.10.0",
 ]
