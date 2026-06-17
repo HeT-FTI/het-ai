@@ -36,7 +36,7 @@ through a single, consistent interface, regardless of your ML framework.
 
         📦 DVC Integration
         ^^^^^^^^^^^^^^^^^^
-        Data versioning with DVC + MinIO. Resolve tags, pull data,
+        Data versioning with DVC + SeaweedFS. Resolve tags, pull data,
         and trace every experiment back to its data version.
 
     .. grid-item-card::
@@ -131,7 +131,7 @@ Key Features
       - Annotate search spaces with ``@search`` — no Optuna boilerplate.
     * - 📈 **Multi-objective**
       - Native Pareto-front support with customisable selection logic.
-    * - 🔌 **DVC + MinIO**
+    * - 🔌 **DVC + SeaweedFS**
       - Automatic data version resolution and pull on every run.
     * - 📊 **MLflow auto-logging**
       - Params, metrics, lineage, and model registration — zero extra code.

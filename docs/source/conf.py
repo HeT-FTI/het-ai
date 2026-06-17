@@ -81,7 +81,6 @@ autodoc_mock_imports = [
     "mlflow.sklearn",
     "mlflow.pyfunc",
     "mlflow.keras",
-    "minio",
     "dvc",
     "requests",
     "onnx",

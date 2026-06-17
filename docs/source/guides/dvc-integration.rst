@@ -1,11 +1,11 @@
 DVC Integration
 ================
 
-The ``het_ai.dvc`` module provides **automatic data versioning** via DVC + MinIO.
+The ``het_ai.dvc`` module provides **automatic data versioning** via DVC + SeaweedFS.
 When enabled, every HPO run automatically:
 
 1. Resolves the appropriate data version tag
-2. Pulls the actual data from MinIO remote storage
+2. Pulls the actual data from SeaweedFS remote storage
 3. Injects version metadata into the ``DataBundle``
 4. Tags the corresponding MLflow experiment with the data version
 
@@ -32,20 +32,20 @@ All fields are environment-variable-driven:
     * - ``github_api_base``
       - ``DVC_GITHUB_API_BASE``
       - API base URL (default: ``https://api.github.com``)
-    * - ``minio_endpoint``
-      - ``DVC_MINIO_ENDPOINT``
-      - MinIO server address (e.g. ``minio.example.com:9000``)
-    * - ``minio_access_key``
-      - ``DVC_MINIO_ACCESS_KEY``
-      - MinIO access key
-    * - ``minio_secret_key``
-      - ``DVC_MINIO_SECRET_KEY``
-      - MinIO secret key
-    * - ``minio_bucket``
-      - ``DVC_MINIO_BUCKET``
-      - Bucket name (typically ``dvc``)
-    * - ``minio_virtual_folder``
-      - ``DVC_MINIO_VIRTUAL_FOLDER``
+    * - ``seaweedfs_endpoint``
+      - ``SEAWEEDFS_ENDPOINT``
+      - SeaweedFS S3 server address (e.g. ``seaweedfs.internal:8333``)
+    * - ``seaweedfs_access_key``
+      - ``SEAWEEDFS_ACCESS_KEY``
+      - SeaweedFS access key
+    * - ``seaweedfs_secret_key``
+      - ``SEAWEEDFS_SECRET_KEY``
+      - SeaweedFS secret key
+    * - ``seaweedfs_bucket``
+      - ``SEAWEEDFS_BUCKET``
+      - Bucket name (default: ``dvc-store``)
+    * - ``seaweedfs_virtual_folder``
+      - ``SEAWEEDFS_VIRTUAL_FOLDER``
       - Optional prefix within the bucket
     * - ``tag_strategy``
       - ``DVC_TAG_STRATEGY``
@@ -108,7 +108,7 @@ When ``trainer.run()`` is called with ``config.dvc`` set:
 1. ``DVCLoader`` is instantiated with the ``DVCConfig``.
 2. ``TagResolver.resolve()`` returns ``(tag_name, commit_sha)``.
 3. ``DVCLoader`` downloads the ``.dvc`` pointer files from GitHub at the resolved tag.
-4. DVC remote is configured to point to the MinIO bucket.
+4. DVC remote is configured to point to the SeaweedFS bucket.
 5. ``dvc pull`` + ``dvc checkout`` fetches and checks out the actual data files.
 6. ``DVCLoader.enrich_bundle()`` injects version metadata into ``DataBundle.meta``:
 

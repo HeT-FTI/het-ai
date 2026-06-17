@@ -1,7 +1,7 @@
 DVC API Reference
 ==================
 
-The ``het_ai.dvc`` package provides DVC + MinIO data versioning integration.
+The ``het_ai.dvc`` package provides DVC + SeaweedFS data versioning integration.
 
 DVCConfig
 ---------

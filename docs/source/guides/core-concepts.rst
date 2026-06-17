@@ -35,7 +35,7 @@ het-ai splits the ML training lifecycle into three layers:
     }
 
     package "het_ai.dvc" as DVC #E8F5E9 {
-        [DVCLoader\ndata version pull (DVC + MinIO)] as d1
+        [DVCLoader\ndata version pull (DVC + SeaweedFS)] as d1
     }
 
     package "het_ai.mlflow" as MLflow #FCE4EC {
@@ -274,7 +274,7 @@ safety without requiring user awareness.
 Next Steps
 ----------
 
-- :doc:`dvc-integration` — data versioning with DVC + MinIO
+- :doc:`dvc-integration` — data versioning with DVC + SeaweedFS
 - :doc:`mlflow-integration` — automatic MLflow logging
 - :doc:`advanced` — multi-objective, pruning, custom hooks, parallel trials
 
