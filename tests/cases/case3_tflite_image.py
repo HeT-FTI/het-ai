@@ -4,7 +4,7 @@
 """
 import numpy as np
 from pathlib import Path
-from het_ai.mlflow import MLflowConfig
+from het_ai.mlflow import MLflowConfig, MLflowRunLogger
 from het_ai.studio import BaseTrainer, DataBundle, TrainConfig, TrainResult
 
 
@@ -368,7 +368,7 @@ class TFImageTrainer(BaseTrainer):
         learning_rate = BaseTrainer.TunableFloat(1e-4, 1e-2, log=True),
         freeze_layers = BaseTrainer.TunableInt(0, 10),
         batch_size    = BaseTrainer.TunableCategorical([8, 16]),
-        epochs        = BaseTrainer.TunableInt(30, 80),
+        epochs        = BaseTrainer.TunableInt(2, 3),
         imgsz         = BaseTrainer.TunableCategorical([640]),
         patience      = BaseTrainer.TunableInt(10, 30),
     )
@@ -488,16 +488,29 @@ class TFImageTrainer(BaseTrainer):
 
 
 def main(dvc_data_root: str = "__dvc__", mlflow_config: MLflowConfig | None = None):
+    resolved_mlflow = mlflow_config or MLflowConfig(
+        tracking_uri="http://10.12.8.110:5000",
+        experiment_name="case3_tflite_image",
+    )
     config  = TrainConfig(
-        n_trials=2,
-        mlflow=MLflowConfig(
-            tracking_uri="http://10.12.8.110:5000",
-            experiment_name="case3_tflite_image",
-        ),
+        n_trials=1,
+        mlflow=resolved_mlflow,
     )
     trainer = TFImageTrainer(config)
-    result = trainer.run(dvc_data_root)
-    return result.to_tuple()
+
+    try:
+        result = trainer.run(dvc_data_root)
+        return result.to_tuple()
+    except Exception as exc:
+        MLflowRunLogger(resolved_mlflow).log_exception(
+            exc=exc,
+            artifact_file="logs/exception_traceback.txt",
+            run_name=getattr(config, "study_name"),
+            extra_context={
+                "scope": "case3.main",
+                "dvc_data_root": str(dvc_data_root),
+            },
+        )
 
 if __name__ == "__main__":
     print(main())

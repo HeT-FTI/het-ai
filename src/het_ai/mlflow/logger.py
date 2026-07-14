@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import traceback
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -144,8 +146,8 @@ class MLflowRunLogger:
 
     def __init__(self, config: MLflowConfig):
         self.config = config
+        self._owned_run_id: Optional[str] = None
         mlflow.set_tracking_uri(config.tracking_uri)
-        mlflow.set_experiment(config.experiment_name)
 
     # ── 公共入口 ──────────────────────────────────────────────────────────────
 
@@ -156,7 +158,7 @@ class MLflowRunLogger:
         run_name: Optional[str] = None,
     ) -> None:
         """一次性完成所有 MLflow 上报，被 WorkflowRunner.execute() 自动调用。"""
-        with mlflow.start_run(run_name=run_name):
+        with self._active_or_new_run(run_name=run_name):
             self._log_params(result)
             self._log_metrics(result)
             if self.config.log_dataset_lineage:
@@ -165,6 +167,51 @@ class MLflowRunLogger:
             if result.model_path:
                 self._log_model(bundle, result)
             self._log_artifacts(result)
+
+    def log_text(self, text: str, artifact_file: str, run_name: Optional[str] = None) -> None:
+        """
+        记录文本到 MLflow Artifact。
+
+        若当前已有 active run，则复用；否则新建 run 后写入。
+        """
+        if not artifact_file or text is None:
+            return
+
+        with self._active_or_new_run(run_name=run_name):
+            mlflow.log_text(str(text), artifact_file=artifact_file)
+
+    def log_exception(
+        self,
+        exc: Exception,
+        artifact_file: str = "logs/exception_traceback.txt",
+        run_name: Optional[str] = None,
+        extra_context: Optional[dict[str, str]] = None,
+    ) -> None:
+        """
+        将异常信息格式化后写入 MLflow Artifact。
+        """
+        lines = []
+        if extra_context:
+            for k, v in extra_context.items():
+                lines.append(f"{k}: {v}")
+        lines.extend([
+            f"exception_type: {type(exc).__name__}",
+            f"exception_message: {str(exc)}",
+            "",
+            "traceback:",
+            traceback.format_exc(),
+        ])
+
+        active = mlflow.active_run()
+        if active is not None:
+            mlflow.set_tag("run_status", "failed")
+            mlflow.set_tag("exception_type", type(exc).__name__)
+
+        self.log_text(
+            text="\n".join(lines),
+            artifact_file=artifact_file,
+            run_name=run_name,
+        )
 
     # ── ① params：展平一层嵌套 dict ──────────────────────────────────────────
 
@@ -302,6 +349,29 @@ class MLflowRunLogger:
                         )
 
     # ── 工具方法 ──────────────────────────────────────────────────────────────
+
+    @contextmanager
+    def _active_or_new_run(self, run_name: Optional[str] = None):
+        active = mlflow.active_run()
+        if active is not None:
+            yield active
+            return
+
+        # 仅在需要内部创建 run 时设置 experiment。
+        # 外部已有 active run 的场景会在上面直接复用，不触发此调用。
+        if self._owned_run_id is None:
+            mlflow.set_experiment(self.config.experiment_name)
+
+        start_kwargs = (
+            {"run_id": self._owned_run_id}
+            if self._owned_run_id is not None
+            else {"run_name": run_name}
+        )
+
+        with mlflow.start_run(**start_kwargs) as run:
+            if self._owned_run_id is None:
+                self._owned_run_id = run.info.run_id
+            yield run
 
     @staticmethod
     def _build_dataframe(X, y, feature_list, target_list) -> pd.DataFrame:

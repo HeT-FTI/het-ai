@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+import traceback
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -29,6 +30,7 @@ class WorkflowRunner:
         self.config = trainer.config
 
     def execute(self, dvc_data_root: str) -> TrainResult:
+        mlflow_cfg = getattr(self.config, "mlflow", None)
         self._validate()
 
         # ── Step 0: 自动 DVC 数据拉取（仅当 config.dvc 已配置时）────────────
@@ -68,7 +70,6 @@ class WorkflowRunner:
 
         result = self.trainer.before_mlflow_log(result) or result
 
-        mlflow_cfg = getattr(self.config, "mlflow", None)
         if mlflow_cfg is not None:
             from het_ai.mlflow.logger import MLflowRunLogger
             MLflowRunLogger(mlflow_cfg).log(
@@ -154,6 +155,11 @@ class WorkflowRunner:
                 trial.set_user_attr("metric_objective", float(score))
                 return float(score)
 
+            except Exception:
+                # 保留 trial 原始异常堆栈，供上层一次性汇总并上报。
+                trial.set_user_attr("__fail_reason__", traceback.format_exc())
+                raise
+
             finally:
                 trainer._trial_local.current = None
 
@@ -197,13 +203,40 @@ class WorkflowRunner:
         return study
 
     def _pick_best_trial(self, study: optuna.Study):
+        completed = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+        if not completed:
+            raise RuntimeError(self._format_no_completed_trial_error(study))
+
         objectives_def = getattr(self.trainer, "objectives", None)
         if objectives_def:
             pareto = study.best_trials
             if not pareto:
-                raise RuntimeError("Optuna study 没有任何完成的 trial。")
+                raise RuntimeError(self._format_no_completed_trial_error(study))
             return self.trainer.select_best_trial(pareto)
         return study.best_trial
+
+    def _format_no_completed_trial_error(self, study: optuna.Study) -> str:
+        failed = [t for t in study.trials if t.state == optuna.trial.TrialState.FAIL]
+        if not failed:
+            return "Optuna study 没有任何完成的 trial。"
+
+        lines = [
+            "Optuna study 没有任何完成的 trial。",
+            f"failed_trials={len(failed)}",
+            "failed_reasons:",
+        ]
+
+        for t in failed:
+            reason = (
+                t.user_attrs.get("__fail_reason__")
+                or t.system_attrs.get("fail_reason")
+                or "<no fail_reason>"
+            )
+            lines.append(f"- trial={t.number}")
+            lines.append(f"  params={t.params}")
+            lines.append(f"  reason={reason}")
+
+        return "\n".join(lines)
 
     def _save_summary(self, study, best_trial, export_path: str) -> str:
         summary = {
