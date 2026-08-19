@@ -12,8 +12,8 @@ if TYPE_CHECKING:
 @dataclass
 class TrainConfig:
     """
-    平台级训练配置。
-    优先级：环境变量 > 显式传参 > 默认值。
+    Platform-level training configuration.
+    Priority: environment variables > explicit arguments > default values.
     """
 
     n_trials: int = field(

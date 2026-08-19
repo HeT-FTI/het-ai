@@ -21,7 +21,7 @@ from het_ai.studio.types import (
 
 class BaseTrainer(ABC):
     """
-    平台级训练基类。
+    Platform-level base class for trainers.
     """
 
     search = staticmethod(GhostInjector.search)
@@ -89,24 +89,27 @@ class BaseTrainer(ABC):
 
     def before_mlflow_log(self, result: "TrainResult") -> "TrainResult":
         """
-        训练结果在上传到 MLflow 之前的回调钩子。
-        子类可在这里修改 result 的值，例如追加 artifact_file_paths 或调整 metric_dict。
+        Callback hook invoked before the training result is uploaded to MLflow.
+        Subclasses may modify the result here, e.g. append to artifact_file_paths
+        or adjust metric_dict.
 
         Args:
-            result: 即将交给 MLflow 上传的标准化结果对象。
+            result: The normalized result object about to be uploaded to MLflow.
 
         Returns:
-            修改后的 result；也允许原地修改后直接返回同一个对象。
+            The modified result; may also return the same object after in-place
+            modification.
         """
         return result
 
     def on_model_registered(self, result: "TrainResult") -> None:
         """
-        模型注册到 MLflow Model Registry 后的回调钩子。
-        子类可覆写以触发部署（K8s、Seldon、TorchServe 等）或发送通知。
+        Callback hook invoked after the model is registered in the MLflow Model
+        Registry. Subclasses may override it to trigger deployment (K8s, Seldon,
+        TorchServe, etc.) or send notifications.
 
         Args:
-            result: 训练完成后的标准化结果对象。
+            result: The normalized result object after training completes.
         """
 
     def predict(self, model_path: str, inputs: Any) -> Any:
@@ -114,8 +117,8 @@ class BaseTrainer(ABC):
 
     def _validate_integration_configs(self) -> None:
         """
-        检查 TrainConfig 中集成配置的必填字段。
-        在 dry_run() 和 run() 之前调用，提前发现配置错误。
+        Validate the required fields of the integration configs in TrainConfig.
+        Called before dry_run() and run() to surface configuration errors early.
         """
         dvc_cfg = getattr(self.config, "dvc", None)
         if dvc_cfg is not None:
@@ -221,9 +224,9 @@ class BaseTrainer(ABC):
 
     @staticmethod
     def _unpack_train_result(raw) -> tuple:
-        """解包 train() 返回值，支持三元返回。
-        
-        返回: (score, artifact, metrics_dict)
+        """Unpack the return value of train(), supporting three-element returns.
+
+        Returns: (score, artifact, metrics_dict)
         """
         if isinstance(raw, tuple) and len(raw) == 3:
             return raw[0], raw[1], raw[2]

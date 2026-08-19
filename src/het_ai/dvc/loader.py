@@ -19,29 +19,33 @@ from het_ai.studio.bundle import DataBundle
 @runtime_checkable
 class TagResolver(Protocol):
     """
-    决定"当前应该使用哪个数据版本"的策略接口。
+    Strategy interface that decides which data version should be used.
 
-    框架提供 GitHubTagResolver（默认），用户可自行实现：
-      - SemverLatestResolver   按语义化版本取最新
-      - GitLabTagResolver      对接 GitLab API
-      - FixedTagResolver       固定版本（离线/复现场景）
-      - EnvTagResolver         从环境变量读取 tag（CI 场景）
+    The framework provides GitHubTagResolver (default); users may implement
+    their own:
+
+    - ``SemverLatestResolver`` — pick the latest version by semantic versioning
+    - ``GitLabTagResolver`` — integrate with the GitLab API
+    - ``FixedTagResolver`` — fix a version (offline / reproduction scenarios)
+    - ``EnvTagResolver`` — read the tag from an environment variable (CI)
     """
     def resolve(self) -> Tuple[str, str]:
         """
-        返回 (tag_name, commit_sha)。
-        tag_name 将写入 DataBundle.meta["dvc_version"]，作为数据版本的唯一标识。
+        Returns (tag_name, commit_sha).
+        tag_name is written to DataBundle.meta["dvc_version"] as the unique
+        identifier of the data version.
         """
         ...
 
 
 class GitHubTagResolver:
     """
-    从 GitHub 仓库解析数据版本 tag。
-    支持两种策略（由 DVCConfig.tag_strategy 控制）：
+    Resolves the data version tag from a GitHub repository.
+    Supports two strategies (controlled by ``DVCConfig.tag_strategy``):
 
-      "release" — 取名称匹配 release* 的最新 tag（mlops_demo 的当前行为）
-      "latest"  — 取时间最新的 tag（无论名称）
+    - ``"release"`` — take the newest tag whose name matches ``release*`` (the
+      current behavior of ``mlops_demo``).
+    - ``"latest"`` — take the newest tag by date (regardless of name).
     """
 
     def __init__(self, config: DVCConfig):
@@ -129,16 +133,20 @@ class GitHubTagResolver:
 
 class FixedTagResolver:
     """
-    固定版本解析器：直接使用指定的 tag，不通过 GitHub API 解析最新版本。
+    Fixed version resolver: uses the specified tag directly instead of resolving
+    the latest version through the GitHub API.
 
-    注意：此 Resolver 仅跳过 tag 解析步骤，DVCLoader.pull() 仍需网络访问
-    GitHub 下载 .dvc 指针文件并从 SeaweedFS(S3) 拉取实际数据。
-    若需完全离线运行，应跳过 pull() 直接使用已缓存的本地数据。
+    Note: this resolver only skips the tag resolution step; DVCLoader.pull()
+    still needs network access to GitHub to download the .dvc pointer files and
+    pull the actual data from SeaweedFS (S3). For fully offline runs, skip
+    pull() and use locally cached data instead.
 
-    适用场景：
-      - 复现指定版本的实验（tag 已知，无需动态解析）
-      - CI 中由外部系统决定数据版本
-      - 本地调试时避免 tag 解析的 GitHub API 调用 
+    Use cases:
+
+    - Reproducing an experiment for a specific version (tag known, no dynamic
+      resolution needed)
+    - CI where the data version is decided by an external system
+    - Local debugging that avoids GitHub API calls for tag resolution
     """
 
     def __init__(self, tag: str, commit_sha: str = ""):
@@ -155,19 +163,24 @@ class FixedTagResolver:
 
 class DVCLoader:
     """
-    将 mlops_demo.GitHubDVCLoader 的能力提炼为框架原生组件。
+    Distills the capabilities of ``mlops_demo.GitHubDVCLoader`` into a native
+    framework component.
 
-    设计分工：
-      TagResolver  — 决定"用哪个版本"（可替换，默认 GitHubTagResolver）
-      DVCLoader    — 决定"怎么拿数据"（DVC 机械操作，固定不变）
+    Design split:
 
-    基本用法（零配置，从环境变量读取）：
+    - ``TagResolver`` — decides "which version to use" (replaceable; defaults
+      to :class:`GitHubTagResolver`).
+    - ``DVCLoader`` — decides "how to get the data" (fixed DVC operations).
+
+    Basic usage (zero configuration, reads from environment variables)::
+
         loader = DVCLoader(DVCConfig())
         tag, sha = loader.pull(Path("dvc_data"))
         bundle = DataBundle(...)
         return loader.enrich_bundle(bundle, tag, sha)
 
-    自定义版本解析策略：
+    Custom version resolution strategy::
+
         resolver = FixedTagResolver("release-20250101")
         loader = DVCLoader(config, tag_resolver=resolver)
     """
@@ -198,11 +211,11 @@ class DVCLoader:
 
     def pull(self, output_path: Path) -> Tuple[str, str]:
         """
-        完整数据拉取流程：
-          1. 通过 TagResolver 确定数据版本 tag
-          2. 从 GitHub 下载 .dvc 指针文件
-          3. 配置 DVC remote（SeaweedFS S3），执行 dvc pull + checkout
-          4. 返回 (tag, commit_sha) 供 enrich_bundle 使用
+        Full data pull workflow:
+          1. Determine the data version tag via TagResolver
+          2. Download the .dvc pointer files from GitHub
+          3. Configure the DVC remote (SeaweedFS S3), run dvc pull + checkout
+          4. Return (tag, commit_sha) for use by enrich_bundle
         """
         tag, commit_sha = self._resolver.resolve()
         output_path.mkdir(parents=True, exist_ok=True)
@@ -238,7 +251,7 @@ class DVCLoader:
     def enrich_bundle(
         self, bundle: DataBundle, tag: str, commit_sha: str
     ) -> DataBundle:
-        """将 DVC 版本元数据注入 DataBundle.meta，实现数据→实验溯源闭环。"""
+        """Inject DVC version metadata into DataBundle.meta to close the data->experiment traceability loop."""
         bundle.meta.update({
             "dvc_version":    tag,
             "dvc_commit_sha": commit_sha,

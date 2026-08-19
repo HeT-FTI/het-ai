@@ -115,17 +115,21 @@ _DEFAULT_FLAVOR_REGISTRY: dict[str, FlavorLogFn] = {
 
 class MLflowRunLogger:
     """
-    在 WorkflowRunner 执行结束后，将 TrainResult 完整上报到 MLflow。
+    Reports a TrainResult to MLflow in full after WorkflowRunner finishes.
 
-    上报内容：
-      ① mlflow.log_params       ← result.params_dict（自动展平一层嵌套）
-      ② mlflow.log_metric(s)    ← result.metric_dict（list → per-step）
-      ③ mlflow.log_input        ← DataBundle 各 split 的数据集血缘（含 DVC 版本标签）
-      ④ mlflow.set_tags         ← result.tag_dict + bundle.meta 中所有 dvc_* 字段
-      ⑤ mlflow.log_model        ← 通过 flavor 注册表按后缀自动分发
-      ⑥ mlflow.log_artifact(s)  ← result.artifact_file_paths
+    What is reported:
+      1. mlflow.log_params       <- result.params_dict (auto-flattens one level
+                                    of nesting)
+      2. mlflow.log_metric(s)    <- result.metric_dict (list -> per-step)
+      3. mlflow.log_input        <- dataset lineage of each DataBundle split
+                                    (incl. DVC version tags)
+      4. mlflow.set_tags         <- result.tag_dict + all dvc_* fields in
+                                    bundle.meta
+      5. mlflow.log_model        <- dispatched by file extension via the flavor
+                                    registry
+      6. mlflow.log_artifact(s)  <- result.artifact_file_paths
 
-    扩展自定义 flavor：
+    Register a custom flavor:
         MLflowRunLogger.register_flavor("h5", my_keras_log_fn)
     """
 
@@ -135,12 +139,12 @@ class MLflowRunLogger:
     @classmethod
     def register_flavor(cls, extension: str, log_fn: FlavorLogFn) -> None:
         """
-        注册自定义模型 flavor。
+        Register a custom model flavor.
 
         Args:
-            extension: 文件后缀（不含点），如 "h5", "cbm"
-            log_fn:    签名为 (model_path, signature, input_example,
-                                registered_name, register_model) -> None
+            extension: File extension without the leading dot, e.g. "h5", "cbm"
+            log_fn:    Signature (model_path, signature, input_example,
+                       registered_name, register_model) -> None
         """
         cls._flavor_registry[extension.lower().lstrip(".")] = log_fn
 
@@ -157,7 +161,7 @@ class MLflowRunLogger:
         result: TrainResult,
         run_name: Optional[str] = None,
     ) -> None:
-        """一次性完成所有 MLflow 上报，被 WorkflowRunner.execute() 自动调用。"""
+        """Complete all MLflow reporting in one call; invoked automatically by WorkflowRunner.execute()."""
         with self._active_or_new_run(run_name=run_name):
             self._log_params(result)
             self._log_metrics(result)
@@ -170,9 +174,10 @@ class MLflowRunLogger:
 
     def log_text(self, text: str, artifact_file: str, run_name: Optional[str] = None) -> None:
         """
-        记录文本到 MLflow Artifact。
+        Log text to an MLflow Artifact.
 
-        若当前已有 active run，则复用；否则新建 run 后写入。
+        If there is already an active run, it is reused; otherwise a new run is
+        started before writing.
         """
         if not artifact_file or text is None:
             return
@@ -188,7 +193,7 @@ class MLflowRunLogger:
         extra_context: Optional[dict[str, str]] = None,
     ) -> None:
         """
-        将异常信息格式化后写入 MLflow Artifact。
+        Format exception information and write it to an MLflow Artifact.
         """
         lines = []
         if extra_context:
@@ -217,9 +222,9 @@ class MLflowRunLogger:
 
     def _log_params(self, result: TrainResult) -> None:
         """
-        MLflow 要求所有 param value 是标量。
-        对一层嵌套 dict 自动展平：
-          {"best_trial_params": {"lr": 0.01}} → {"best_trial_params.lr": 0.01}
+        MLflow requires all param values to be scalars.
+        Automatically flattens one level of nested dicts:
+          {"best_trial_params": {"lr": 0.01}} -> {"best_trial_params.lr": 0.01}
         """
         flat: dict = {}
         for k, v in result.params_dict.items():

@@ -4,8 +4,9 @@ from typing import Any
 
 class GhostInjector:
     """
-    纯标注装饰器工厂。
-    只负责把搜索空间元数据挂到函数上，不负责执行采样。
+    A pure annotation decorator factory.
+    It only attaches the search space metadata to the function; it does not
+    perform sampling.
     """
 
     @staticmethod

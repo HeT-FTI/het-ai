@@ -45,8 +45,9 @@ class TunableCategorical(str, TunableBase):
 
 class Result:
     """
-    多目标优化返回值包装器。
-    优化方向在 BaseTrainer.objectives 类属性中声明，此处只携带数值。
+    A wrapper for multi-objective optimization return values.
+    The optimization directions are declared in the BaseTrainer.objectives class
+    attribute; this class only carries the values.
     """
 
     def __init__(self, **kwargs: float):

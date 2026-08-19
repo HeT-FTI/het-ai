@@ -4,7 +4,7 @@ import os
 
 @dataclass
 class MLflowConfig:
-    """MLflow 上报配置。"""
+    """MLflow reporting configuration."""
 
     tracking_uri: str = field(
         default_factory=lambda: os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000")

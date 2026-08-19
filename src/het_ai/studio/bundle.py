@@ -5,7 +5,8 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class DataBundle:
     """
-    通用数据容器，不预设任务类型、框架或数据结构。
+    A generic data container that does not presume any task type, framework,
+    or data structure.
     """
 
     splits: Dict[str, Any] = field(default_factory=dict)

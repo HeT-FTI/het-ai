@@ -3,7 +3,7 @@ import os
 
 @dataclass
 class DVCConfig:
-    """DVC + SeaweedFS 远端配置。优先级：环境变量 > 显式传参 > 默认值。"""
+    """DVC + SeaweedFS remote configuration. Priority: environment variables > explicit arguments > default values."""
 
     # GitHub 数据仓库
     github_repo: str = field(

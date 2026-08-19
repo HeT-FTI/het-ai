@@ -8,7 +8,8 @@ if TYPE_CHECKING:
 @dataclass
 class TrainResult:
     """
-    标准化训练结果，支持 to_tuple() 向后兼容 MLOps 平台协议。
+    A standardized training result, supporting to_tuple() for backward
+    compatibility with the MLOps platform protocol.
     """
 
     tag_dict: Dict[str, Any]

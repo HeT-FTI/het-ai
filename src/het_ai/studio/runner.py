@@ -22,7 +22,7 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 class WorkflowRunner:
     """
-    内部编排引擎，用户不直接使用。
+    Internal orchestration engine; not intended for direct use by users.
     """
 
     def __init__(self, trainer: "BaseTrainer"):

@@ -55,8 +55,8 @@ Code Style
 ----------
 
 - Follow `PEP 8 <https://peps.python.org/pep-0008/>`_.
-- Docstrings are written in **Chinese** (project convention). Use Google-style
-  formatting.
+- Docstrings are written in **English** (project convention). Use Google-style
+  formatting so that ``sphinx.ext.napoleon`` renders them correctly.
 - Keep imports organised: standard library → third-party → local.
 - Use type hints for all public methods and functions.
 
