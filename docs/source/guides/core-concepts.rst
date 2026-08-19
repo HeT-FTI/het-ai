@@ -8,44 +8,15 @@ Architecture Overview
 
 het-ai splits the ML training lifecycle into three layers:
 
-.. kroki::
-    :type: plantuml
-    :format: svg
+.. image:: ../_static/architecture.svg
+   :alt: het-ai architecture overview
+   :width: 100%
 
-    @startuml
-    skinparam componentStyle rectangle
-    skinparam backgroundColor #FEFEFE
-    skinparam defaultFontSize 13
+.. note::
 
-    title het-ai Architecture Overview
-
-    package "User Code" as User #E8F0FE {
-        [my_trainer = MyTrainer(config)] as uc1
-        [my_trainer.dry_run()  // local validation] as uc2
-        [my_trainer.run()      // full HPO pipeline] as uc3
-    }
-
-    package "het_ai.studio (Core)" as Studio #FFF3E0 {
-        [BaseTrainer\nuser-facing abstraction] as s1
-        [TrainConfig\nenv-variable-driven config] as s2
-        [DataBundle\nframework-agnostic data container] as s3
-        [GhostInjector\n@search decorator (no Optuna import)] as s4
-        [WorkflowRunner\ninternal orchestration engine] as s5
-        [TrainResult\nstandardised output protocol] as s6
-    }
-
-    package "het_ai.dvc" as DVC #E8F5E9 {
-        [DVCLoader\ndata version pull (DVC + SeaweedFS)] as d1
-    }
-
-    package "het_ai.mlflow" as MLflow #FCE4EC {
-        [MLflowRunLogger\nauto-log params/metrics/model/lineage] as m1
-    }
-
-    User --> Studio : depends on
-    Studio --> DVC : optional integration
-    Studio --> MLflow : optional integration
-    @enduml
+    The editable source of this diagram is kept at
+    ``docs/source/_static/architecture.puml``. To regenerate the SVG, paste it
+    into `Kroki <https://kroki.io>`_ or run PlantUML locally.
 
 Concept 1: TrainConfig
 ----------------------

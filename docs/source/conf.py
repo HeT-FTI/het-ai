@@ -45,13 +45,7 @@ extensions = [
     "sphinx_copybutton",
     "sphinx_design",
     "sphinx_autodoc_typehints",
-    "sphinxcontrib.kroki",
 ]
-
-# Kroki settings (PlantUML via Kroki HTTP API — no local Java required)
-kroki_server = "https://kroki.io"
-kroki_diagram_types = ["plantuml"]
-kroki_plantuml_output_format = "svg"
 
 # Napoleon settings (Google-style docstrings)
 napoleon_google_docstring = True
