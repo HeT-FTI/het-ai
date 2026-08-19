@@ -55,6 +55,7 @@ class ClusteringTrainer(BaseTrainer):
         max_iter   = BaseTrainer.TunableInt(100, 500),
     )
     def train(self, data: DataBundle, n_clusters, init, n_init, max_iter):
+        np.random.seed(self.config.random_state)
         from sklearn.model_selection import train_test_split
 
         X      = data.splits['all']['X']

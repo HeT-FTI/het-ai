@@ -109,6 +109,9 @@ class TimeSeriesTrainer(BaseTrainer):
     )
     def train(self, data: DataBundle, lr, hidden_dim, num_layers,
               dropout, batch_size, epochs):
+        # Reproducibility: fix the global RNG so dry_run scores are stable.
+        torch.manual_seed(self.config.random_state)
+        np.random.seed(self.config.random_state)
         model     = LSTMForecaster(
             data.meta['input_dim'], int(hidden_dim),
             int(num_layers), dropout,

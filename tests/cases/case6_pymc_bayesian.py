@@ -151,6 +151,7 @@ class BayesianMixtureTrainer(BaseTrainer):
     def train(self, data: DataBundle, mu_sigma, sigma_prior, draws, tune):
         import pymc as pm
         from sklearn.model_selection import train_test_split
+        np.random.seed(self.config.random_state)
 
         obs = data.splits["all"]["obs"]
         obs_train, obs_val = train_test_split(

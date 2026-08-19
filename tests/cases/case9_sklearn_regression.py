@@ -70,6 +70,7 @@ class SklearnRegressionTrainer(BaseTrainer):
     )
     def train(self, data: DataBundle, n_estimators, max_depth,
               min_samples_leaf, max_features):
+        np.random.seed(self.config.random_state)
         total_estimators = int(n_estimators)
         if getattr(self, '_in_dry_run', False):
             total_estimators = min(total_estimators, 50)

@@ -115,6 +115,9 @@ class TextClassificationTrainer(BaseTrainer):
     )
     def train(self, data: DataBundle, lr, embed_dim, num_filters,
               dropout, batch_size, epochs):
+        # Reproducibility: fix the global RNG so dry_run scores are stable.
+        torch.manual_seed(self.config.random_state)
+        np.random.seed(self.config.random_state)
         model = TextCNN(
             vocab_size=data.meta['vocab_size'],
             embed_dim=int(embed_dim),

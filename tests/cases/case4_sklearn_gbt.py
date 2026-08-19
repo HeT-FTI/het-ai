@@ -67,6 +67,7 @@ class SklearnGBTrainer(BaseTrainer):
     )
     def train(self, data: DataBundle, n_estimators, max_depth,
               learning_rate, subsample, min_samples_split):
+        np.random.seed(self.config.random_state)
         pipe = Pipeline([
             ('scaler', StandardScaler()),
             ('clf',    GradientBoostingClassifier(

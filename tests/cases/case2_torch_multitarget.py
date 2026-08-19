@@ -100,6 +100,8 @@ class MultiTargetTrainer(BaseTrainer):
         loss_weight_t1 = BaseTrainer.TunableFloat(0.2, 0.8),
     )
     def train(self, data: DataBundle, lr, batch_size, epochs, loss_weight_t1):
+        # Reproducibility: fix the global RNG so dry_run scores are stable.
+        torch.manual_seed(self.config.random_state)
         out_dims  = data.meta['num_classes']
         model     = MultiHeadNet(data.meta['input_dim'], out_dims)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)

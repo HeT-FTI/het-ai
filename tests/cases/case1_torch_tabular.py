@@ -90,6 +90,9 @@ class PytorchTabularTrainer(BaseTrainer):
         weight_decay = BaseTrainer.TunableFloat(0.0, 0.01),
     )
     def train(self, data: DataBundle, lr, batch_size, epochs, weight_decay):
+        # Reproducibility: fix the global RNG so dry_run scores are stable.
+        torch.manual_seed(self.config.random_state)
+        np.random.seed(self.config.random_state)
         model     = SimpleNet(data.meta['input_dim'], data.meta['num_classes'])
         optimizer = torch.optim.Adam(
             model.parameters(), lr=lr, weight_decay=weight_decay

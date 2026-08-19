@@ -64,6 +64,7 @@ class AnomalyDetectionTrainer(BaseTrainer):
     )
     def train(self, data: DataBundle, n_estimators, max_samples,
               contamination, max_features):
+        np.random.seed(self.config.random_state)
         from sklearn.model_selection import train_test_split
 
         X      = data.splits['all']['X']
