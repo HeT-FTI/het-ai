@@ -19,11 +19,7 @@ het-ai
 .. |badge6| image:: https://github.com/HeT-FTI/het-ai/actions/workflows/ci.yml/badge.svg
    :target: https://github.com/HeT-FTI/het-ai/actions/workflows/ci.yml
 
-.. |badge7| image:: https://zenodo.org/badge/1248719334.svg
-   :target: https://doi.org/10.5281/zenodo.22010434
-
-|badge1| |badge2| |badge3| |badge4| |badge5| |badge6| |badge7|
-
+|badge1| |badge2| |badge3| |badge4| |badge5| |badge6|
 
 **het-ai** is a framework-agnostic MLOps training DSL that provides a structured
 abstraction for the full training lifecycle, powered by `Optuna <https://optuna.org/>`_-driven
