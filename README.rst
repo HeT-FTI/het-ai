@@ -10,7 +10,20 @@ het-ai
 .. |badge3| image:: https://img.shields.io/badge/HPO-Optuna-blue?logo=optuna
    :target: https://optuna.org/
 
-|badge1| |badge2| |badge3|
+.. |badge4| image:: https://img.shields.io/pypi/v/het-ai.svg?logo=pypi&logoColor=white
+   :target: https://pypi.org/project/het-ai/
+
+.. |badge5| image:: https://readthedocs.org/projects/het-ai/badge/?version=latest
+   :target: https://het-ai.readthedocs.io/en/latest/
+
+.. |badge6| image:: https://github.com/HeT-FTI/het-ai/actions/workflows/ci.yml/badge.svg
+   :target: https://github.com/HeT-FTI/het-ai/actions/workflows/ci.yml
+
+.. |badge7| image:: https://zenodo.org/badge/1248719334.svg
+   :target: https://doi.org/10.5281/zenodo.22010434
+
+|badge1| |badge2| |badge3| |badge4| |badge5| |badge6| |badge7|
+
 
 **het-ai** is a framework-agnostic MLOps training DSL that provides a structured
 abstraction for the full training lifecycle, powered by `Optuna <https://optuna.org/>`_-driven
