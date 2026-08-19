@@ -4,7 +4,7 @@ import tempfile
 import threading
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any
 
 from het_ai.studio.bundle import DataBundle
 from het_ai.studio.config import TrainConfig
@@ -30,10 +30,10 @@ class BaseTrainer(ABC):
     TunableCategorical = TunableCategorical
     Result = Result
 
-    objectives: Optional[Dict[str, Direction]] = None
+    objectives: dict[str, Direction] | None = None
     _trial_local = threading.local()
 
-    def __init__(self, config: Optional[TrainConfig] = None):
+    def __init__(self, config: TrainConfig | None = None):
         self.config = config or TrainConfig()
         self._in_dry_run = False
         self._logger = logging.getLogger(self.__class__.__name__)
@@ -161,7 +161,7 @@ class BaseTrainer(ABC):
         trial.report(value, step=step)
         return trial.should_prune()
 
-    def dry_run(self, dvc_data_root: Optional[str] = None) -> dict:
+    def dry_run(self, dvc_data_root: str | None = None) -> dict:
         # ── 配置结构预检：提前发现外部集成配置错误 ──────────────────────────
         self._validate_integration_configs()
 
@@ -215,7 +215,7 @@ class BaseTrainer(ABC):
             "export_path": export_path,
         }
 
-    def run(self, dvc_data_root: Optional[str] = None) -> TrainResult:
+    def run(self, dvc_data_root: str | None = None) -> TrainResult:
         from het_ai.studio.runner import WorkflowRunner
 
         self._validate_integration_configs()

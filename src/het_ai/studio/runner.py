@@ -41,7 +41,10 @@ class WorkflowRunner:
             loader = DVCLoader(dvc_cfg)
             logger.info("Step 0/4  自动拉取 DVC 数据...")
             _dvc_tag, _dvc_sha = loader.pull(Path(dvc_data_root))
-            logger.info(f"Step 0/4  DVC 数据版本: tag={_dvc_tag}  sha={_dvc_sha[:8] if _dvc_sha else ''}")
+            logger.info(
+                f"Step 0/4  DVC 数据版本: tag={_dvc_tag}  sha="
+                f"{_dvc_sha[:8] if _dvc_sha else ''}"
+            )
 
         logger.info("Step 1/4  加载数据...")
         data = self.trainer.load_data(dvc_data_root)

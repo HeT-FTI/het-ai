@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from het_ai.studio.base import BaseTrainer
@@ -12,16 +14,16 @@ class TrainResult:
     compatibility with the MLOps platform protocol.
     """
 
-    tag_dict: Dict[str, Any]
-    params_dict: Dict[str, Any]
-    metric_dict: Dict[str, Any]
-    feature_list: List[str]
-    target_list: List[str]
-    dataset_splits_dict: Dict[str, Any]
-    model_path: Optional[str]
-    artifact_file_paths: List[str] = field(default_factory=list)
+    tag_dict: dict[str, Any]
+    params_dict: dict[str, Any]
+    metric_dict: dict[str, Any]
+    feature_list: list[str]
+    target_list: list[str]
+    dataset_splits_dict: dict[str, Any]
+    model_path: str | None
+    artifact_file_paths: list[str] = field(default_factory=list)
 
-    trainer: Optional["BaseTrainer"] = field(default=None, repr=False)
+    trainer: BaseTrainer | None = field(default=None, repr=False)
 
     def __getitem__(self, key: str) -> Any:
         if not hasattr(self, key):
@@ -42,7 +44,7 @@ class TrainResult:
                 raise KeyError(key)
             setattr(self, key, value)
 
-    def to_tuple(self) -> Tuple:
+    def to_tuple(self) -> tuple:
         return (
             self.tag_dict,
             self.params_dict,

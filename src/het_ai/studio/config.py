@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import os
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from het_ai.dvc.config import DVCConfig
@@ -17,15 +19,15 @@ class TrainConfig:
     """
 
     n_trials: int = field(
-        default_factory=lambda: int(os.environ.get("N_TRIALS", 100))
+        default_factory=lambda: int(os.environ.get("N_TRIALS", "100"))
     )
     direction: str = field(
         default_factory=lambda: os.environ.get("OPTUNA_DIRECTION", "maximize")
     )
     n_jobs: int = field(
-        default_factory=lambda: int(os.environ.get("OPTUNA_N_JOBS", 1))
+        default_factory=lambda: int(os.environ.get("OPTUNA_N_JOBS", "1"))
     )
-    timeout: Optional[float] = field(
+    timeout: float | None = field(
         default_factory=lambda: (
             float(os.environ["OPTUNA_TIMEOUT"])
             if "OPTUNA_TIMEOUT" in os.environ else None
@@ -34,10 +36,10 @@ class TrainConfig:
     pruner: str = field(
         default_factory=lambda: os.environ.get("OPTUNA_PRUNER", "median")
     )
-    storage: Optional[str] = field(
+    storage: str | None = field(
         default_factory=lambda: os.environ.get("OPTUNA_STORAGE", None)
     )
-    study_name: Optional[str] = None
+    study_name: str | None = None
 
     dvc_data_root: str = field(
         default_factory=lambda: os.environ.get("DVC_DATA_ROOT", "dvc_data")
@@ -45,9 +47,9 @@ class TrainConfig:
     test_size: float = 0.2
     random_state: int = 42
 
-    export_formats: List[str] = field(default_factory=lambda: ["onnx"])
+    export_formats: list[str] = field(default_factory=lambda: ["onnx"])
     onnx_opset_version: int = 18
-    trial_root_dir: Optional[str] = field(
+    trial_root_dir: str | None = field(
         default_factory=lambda: os.environ.get("TRIAL_ROOT_DIR", None)
     )
 
@@ -65,7 +67,7 @@ class TrainConfig:
     # mlflow: 框架自动触发。
     #   设置后，WorkflowRunner 在训练结束时自动完成全部 MLflow 上报。
     #   用户无需在 Trainer 里写任何 mlflow 代码。
-    mlflow: Optional["MLflowConfig"] = None
+    mlflow: MLflowConfig | None = None
 
     # dvc: 用户主动消费的配置载体，框架不自动触发 DVC 拉取。
     #
@@ -81,7 +83,7 @@ class TrainConfig:
     #       return loader.enrich_bundle(bundle, tag, sha)
     #
     # 不使用 DVC 的场景（本地文件、其他数据源）无需设置此字段。
-    dvc: Optional["DVCConfig"] = None
+    dvc: DVCConfig | None = None
 
     def __post_init__(self):
         if self.study_name is None:

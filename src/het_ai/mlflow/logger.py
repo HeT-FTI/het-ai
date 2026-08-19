@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import traceback
+from collections.abc import Callable
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Optional
+from typing import ClassVar
 
 import mlflow
 import mlflow.data
@@ -13,7 +14,6 @@ import pandas as pd
 from het_ai.mlflow.config import MLflowConfig
 from het_ai.studio.bundle import DataBundle
 from het_ai.studio.result import TrainResult
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 模型 Flavor 注册表（替代 if/elif 硬编码链）
@@ -83,7 +83,7 @@ def _log_tflite(model_path, signature, input_example, registered_name, register)
             if self._out["dtype"] in (np.object_, np.bytes_):
                 try:
                     output = np.char.decode(output.astype(np.bytes_), "utf-8")
-                except Exception:
+                except Exception:  # noqa: BLE001, S110 - best-effort decode
                     pass
             return output
 
@@ -134,7 +134,7 @@ class MLflowRunLogger:
     """
 
     # 类级注册表，所有实例共享，支持运行时扩展
-    _flavor_registry: dict[str, FlavorLogFn] = dict(_DEFAULT_FLAVOR_REGISTRY)
+    _flavor_registry: ClassVar[dict[str, FlavorLogFn]] = dict(_DEFAULT_FLAVOR_REGISTRY)
 
     @classmethod
     def register_flavor(cls, extension: str, log_fn: FlavorLogFn) -> None:
@@ -150,7 +150,7 @@ class MLflowRunLogger:
 
     def __init__(self, config: MLflowConfig):
         self.config = config
-        self._owned_run_id: Optional[str] = None
+        self._owned_run_id: str | None = None
         mlflow.set_tracking_uri(config.tracking_uri)
 
     # ── 公共入口 ──────────────────────────────────────────────────────────────
@@ -159,9 +159,11 @@ class MLflowRunLogger:
         self,
         bundle: DataBundle,
         result: TrainResult,
-        run_name: Optional[str] = None,
+        run_name: str | None = None,
     ) -> None:
-        """Complete all MLflow reporting in one call; invoked automatically by WorkflowRunner.execute()."""
+        """Complete all MLflow reporting in one call, invoked automatically by
+        WorkflowRunner.execute().
+        """
         with self._active_or_new_run(run_name=run_name):
             self._log_params(result)
             self._log_metrics(result)
@@ -172,7 +174,7 @@ class MLflowRunLogger:
                 self._log_model(bundle, result)
             self._log_artifacts(result)
 
-    def log_text(self, text: str, artifact_file: str, run_name: Optional[str] = None) -> None:
+    def log_text(self, text: str, artifact_file: str, run_name: str | None = None) -> None:
         """
         Log text to an MLflow Artifact.
 
@@ -189,8 +191,8 @@ class MLflowRunLogger:
         self,
         exc: Exception,
         artifact_file: str = "logs/exception_traceback.txt",
-        run_name: Optional[str] = None,
-        extra_context: Optional[dict[str, str]] = None,
+        run_name: str | None = None,
+        extra_context: dict[str, str] | None = None,
     ) -> None:
         """
         Format exception information and write it to an MLflow Artifact.
@@ -201,7 +203,7 @@ class MLflowRunLogger:
                 lines.append(f"{k}: {v}")
         lines.extend([
             f"exception_type: {type(exc).__name__}",
-            f"exception_message: {str(exc)}",
+            f"exception_message: {exc!s}",
             "",
             "traceback:",
             traceback.format_exc(),
@@ -258,7 +260,7 @@ class MLflowRunLogger:
             for dataset in bundle.lineage_datasets:
                 try:
                     mlflow.log_input(dataset)
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     import logging
                     logging.getLogger(__name__).warning(
                         f"[MLflowRunLogger] log_input 失败 (lineage_datasets): {exc}"
@@ -284,7 +286,7 @@ class MLflowRunLogger:
                         mlflow.data.from_pandas(df, name=source_name, targets=target_col),
                         context=split_name,
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     import logging
                     logging.getLogger(__name__).warning(
                         f"[MLflowRunLogger] log_input 失败 "
@@ -315,7 +317,7 @@ class MLflowRunLogger:
             model_input  = sample_df[result.feature_list]
             model_output = sample_df[result.target_list]
             signature    = mlflow.models.infer_signature(model_input, model_output)
-        except Exception:
+        except Exception:  # noqa: BLE001
             signature   = None
             model_input = None
 
@@ -356,7 +358,7 @@ class MLflowRunLogger:
     # ── 工具方法 ──────────────────────────────────────────────────────────────
 
     @contextmanager
-    def _active_or_new_run(self, run_name: Optional[str] = None):
+    def _active_or_new_run(self, run_name: str | None = None):
         active = mlflow.active_run()
         if active is not None:
             yield active

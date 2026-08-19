@@ -4,7 +4,7 @@ from het_ai.dvc.loader import DVCLoader, FixedTagResolver, GitHubTagResolver, Ta
 __all__ = [
     "DVCConfig",
     "DVCLoader",
-    "TagResolver",
-    "GitHubTagResolver",
     "FixedTagResolver",
+    "GitHubTagResolver",
+    "TagResolver",
 ]

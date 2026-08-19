@@ -1,9 +1,13 @@
-from dataclasses import dataclass, field
 import os
+from dataclasses import dataclass, field
+
 
 @dataclass
 class DVCConfig:
-    """DVC + SeaweedFS remote configuration. Priority: environment variables > explicit arguments > default values."""
+    """DVC + SeaweedFS remote configuration.
+
+    Priority: environment variables > explicit arguments > default values.
+    """
 
     # GitHub 数据仓库
     github_repo: str = field(

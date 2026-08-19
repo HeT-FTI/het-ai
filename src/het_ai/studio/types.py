@@ -1,10 +1,10 @@
-from typing import Any, Dict, List, Literal
+from typing import Any, ClassVar, Literal
 
 Direction = Literal["maximize", "minimize"]
 
 
 class TunableBase:
-    _meta: Dict[str, Any] = {}
+    _meta: ClassVar[dict[str, Any]] = {}
 
 
 class TunableInt(int, TunableBase):
@@ -21,7 +21,7 @@ class TunableInt(int, TunableBase):
 
 
 class TunableFloat(float, TunableBase):
-    def __new__(cls, low: float, high: float, step: float = None, log: bool = False):
+    def __new__(cls, low: float, high: float, step: float | None = None, log: bool = False):
         instance = super().__new__(cls, low)
         instance._meta = {
             "type": "float",
@@ -34,7 +34,7 @@ class TunableFloat(float, TunableBase):
 
 
 class TunableCategorical(str, TunableBase):
-    def __new__(cls, choices: List[Any]):
+    def __new__(cls, choices: list[Any]):
         instance = super().__new__(cls, str(choices[0]))
         instance._meta = {
             "type": "categorical",
@@ -51,10 +51,10 @@ class Result:
     """
 
     def __init__(self, **kwargs: float):
-        self.data: Dict[str, float] = kwargs
+        self.data: dict[str, float] = kwargs
 
-    def get_values(self) -> List[float]:
+    def get_values(self) -> list[float]:
         return list(self.data.values())
 
-    def get_names(self) -> List[str]:
+    def get_names(self) -> list[str]:
         return list(self.data.keys())

@@ -4,13 +4,12 @@ import base64
 import re
 import subprocess
 from pathlib import Path
-from typing import Protocol, Tuple, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 import requests
 
 from het_ai.dvc.config import DVCConfig
 from het_ai.studio.bundle import DataBundle
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 版本解析协议：唯一的解耦点
@@ -29,7 +28,7 @@ class TagResolver(Protocol):
     - ``FixedTagResolver`` — fix a version (offline / reproduction scenarios)
     - ``EnvTagResolver`` — read the tag from an environment variable (CI)
     """
-    def resolve(self) -> Tuple[str, str]:
+    def resolve(self) -> tuple[str, str]:
         """
         Returns (tag_name, commit_sha).
         tag_name is written to DataBundle.meta["dvc_version"] as the unique
@@ -82,7 +81,7 @@ class GitHubTagResolver:
             data.extend(resp.json())
         return data
 
-    def resolve(self) -> Tuple[str, str]:
+    def resolve(self) -> tuple[str, str]:
         tags = self._api(f"/repos/{self._owner_repo}/tags")
 
         if not tags:
@@ -98,7 +97,7 @@ class GitHubTagResolver:
 
         if strategy == "release":
             for tag in tags:
-                if re.match(r"release", tag["name"], re.I):
+                if re.match(r"release", tag["name"], re.IGNORECASE):
                     sha = tag.get("commit", {}).get("sha", "")
                     return tag["name"], sha
             raise RuntimeError(
@@ -120,7 +119,7 @@ class GitHubTagResolver:
                         .get("committer", {})
                         .get("date", "")
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001
                     return ""
 
             best = max(tags, key=_fetch_commit_date)
@@ -153,7 +152,7 @@ class FixedTagResolver:
         self._tag = tag
         self._sha = commit_sha
 
-    def resolve(self) -> Tuple[str, str]:
+    def resolve(self) -> tuple[str, str]:
         return self._tag, self._sha
 
 
@@ -209,7 +208,7 @@ class DVCLoader:
 
     # ── 公共接口 ──────────────────────────────────────────────────────────────
 
-    def pull(self, output_path: Path) -> Tuple[str, str]:
+    def pull(self, output_path: Path) -> tuple[str, str]:
         """
         Full data pull workflow:
           1. Determine the data version tag via TagResolver
@@ -239,8 +238,8 @@ class DVCLoader:
                 fail += 1
                 # 单文件失败不阻断其他文件，但记录
                 import logging
-                logging.getLogger(__name__).error(
-                    f"[DVCLoader] 处理失败 {dvc_path}: {exc}", exc_info=True
+                logging.getLogger(__name__).exception(
+                    f"[DVCLoader] 处理失败 {dvc_path}: {exc}"
                 )
 
         if fail == len(dvc_files):
@@ -251,7 +250,8 @@ class DVCLoader:
     def enrich_bundle(
         self, bundle: DataBundle, tag: str, commit_sha: str
     ) -> DataBundle:
-        """Inject DVC version metadata into DataBundle.meta to close the data->experiment traceability loop."""
+        """Inject DVC version metadata into DataBundle.meta to close the
+        data->experiment traceability loop."""
         bundle.meta.update({
             "dvc_version":    tag,
             "dvc_commit_sha": commit_sha,
@@ -316,8 +316,8 @@ class DVCLoader:
             ["dvc", "checkout", "--force", "--with-deps"],
         ]
         for cmd in commands:
-            result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=300
+            result = subprocess.run(  # noqa: S603 - fixed command list, no shell
+                cmd, capture_output=True, text=True, timeout=300, check=False
             )
             if result.returncode != 0:
                 raise RuntimeError(
