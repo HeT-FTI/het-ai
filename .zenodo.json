@@ -1,0 +1,50 @@
+{
+  "title": "het-ai",
+  "description": "A framework-agnostic MLOps training DSL for Python that provides a structured abstraction over the full machine learning training lifecycle (data loading, hyperparameter optimisation, model training, export, and experiment tracking) through a single, consistent interface, powered by Optuna and integrated with DVC data versioning and MLflow experiment tracking.",
+  "creators": [
+    {
+      "name": "Liu, Fuxin",
+      "affiliation": "Shenzhen HeT Intelligent Control Co., Ltd."
+    },
+    {
+      "name": "Qi, Shixing",
+      "affiliation": "Shenzhen HeT Intelligent Control Co., Ltd."
+    },
+    {
+      "name": "Li, Guiqi",
+      "affiliation": "Shenzhen HeT Intelligent Control Co., Ltd."
+    },
+    {
+      "name": "Tang, Guangfeng",
+      "affiliation": "Shenzhen HeT Intelligent Control Co., Ltd."
+    },
+    {
+      "name": "Yang, Weiwei",
+      "affiliation": "Shenzhen HeT Intelligent Control Co., Ltd."
+    },
+    {
+      "name": "Chen, Bowen",
+      "affiliation": "Shenzhen HeT Intelligent Control Co., Ltd."
+    },
+    {
+      "name": "Zhang, Chen",
+      "affiliation": "Shenzhen HeT Intelligent Control Co., Ltd.",
+      "orcid": "0009-0007-7689-5030"
+    }
+  ],
+  "keywords": [
+    "machine learning",
+    "hyperparameter optimisation",
+    "MLOps",
+    "data versioning",
+    "experiment tracking",
+    "Optuna",
+    "DVC",
+    "MLflow",
+    "Python"
+  ],
+  "license": "Apache-2.0",
+  "upload_type": "software",
+  "access_right": "open",
+  "language": "eng"
+}

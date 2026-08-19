@@ -1,0 +1,9 @@
+---
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/HeT-FTI/het-ai/security/policy
+    about: Please report security vulnerabilities privately — see SECURITY.md.
+  - name: Documentation
+    url: https://het-ai.readthedocs.io/
+    about: Check the online documentation before opening an issue.

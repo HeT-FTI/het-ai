@@ -1,0 +1,46 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "het-ai"
+abstract: >-
+  A framework-agnostic MLOps training DSL for Python that provides a structured
+  abstraction over the full machine learning training lifecycle — data loading,
+  hyperparameter optimisation (HPO), model training, export, and experiment
+  tracking — through a single, consistent interface, powered by Optuna and
+  integrated with DVC data versioning and MLflow experiment tracking.
+authors:
+  - family-names: Liu
+    given-names: Fuxin
+    affiliation: "Shenzhen HeT Intelligent Control Co., Ltd."
+  - family-names: Qi
+    given-names: Shixing
+    affiliation: "Shenzhen HeT Intelligent Control Co., Ltd."
+  - family-names: Li
+    given-names: Guiqi
+    affiliation: "Shenzhen HeT Intelligent Control Co., Ltd."
+  - family-names: Tang
+    given-names: Guangfeng
+    affiliation: "Shenzhen HeT Intelligent Control Co., Ltd."
+  - family-names: Yang
+    given-names: Weiwei
+    affiliation: "Shenzhen HeT Intelligent Control Co., Ltd."
+  - family-names: Chen
+    given-names: Bowen
+    affiliation: "Shenzhen HeT Intelligent Control Co., Ltd."
+  - family-names: Zhang
+    given-names: Chen
+    orcid: "https://orcid.org/0009-0007-7689-5030"
+    affiliation: "Shenzhen HeT Intelligent Control Co., Ltd."
+keywords:
+  - machine learning
+  - hyperparameter optimisation
+  - MLOps
+  - data versioning
+  - experiment tracking
+  - Optuna
+  - DVC
+  - MLflow
+  - Python
+license: Apache-2.0
+repository-code: "https://github.com/HeT-FTI/het-ai"
+version: 1.0.0
+date-released: "2026-08-19"
