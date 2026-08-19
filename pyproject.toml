@@ -109,3 +109,30 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+# Pinned rule set so CI results are deterministic across ruff versions.
+select = [
+  "E",    # pycodestyle errors
+  "F",    # pyflakes
+  "I",    # isort
+  "UP",   # pyupgrade (modern typing)
+  "RUF",  # ruff-specific rules
+  "FURB", # refurb
+  "G",    # logging
+  "PLW",  # pylint warnings
+  "S",    # bandit
+  "BLE",  # blind except
+]
+ignore = [
+  # The codebase intentionally uses Chinese comments and Unicode symbols;
+  # these rules would otherwise flag every non-ASCII comment/string.
+  "RUF001", # ambiguous-unicode-character-string
+  "RUF003", # ambiguous-unicode-character-comment
+  # f-strings in logging calls are an accepted style choice here.
+  "G004",
+]
