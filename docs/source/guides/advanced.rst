@@ -233,5 +233,5 @@ Next Steps
 ----------
 
 - :doc:`../api/studio` — full Studio API reference
-- :doc:`../examples/index` — see these features in action across 12 examples
+- :doc:`../examples/cases` — see these features in action across 12 examples
 
